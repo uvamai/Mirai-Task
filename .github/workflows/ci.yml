@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mirai
+          POSTGRES_PASSWORD: mirai
+          POSTGRES_DB: mirai_tasker
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mirai -d mirai_tasker"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://mirai:mirai@localhost:5432/mirai_tasker
+      JWT_ACCESS_SECRET: ci-test-jwt-access-secret-min-32-chars
+      JWT_REFRESH_SECRET: ci-test-jwt-refresh-secret-min-32-chars
+      ALLOW_X_TENANT_ID: "true"
+      BILLING_MODE: mock
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install
+        run: npm install
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Migrate
+        run: npm run migrate -w @mirai/api
+      - name: Lint API
+        run: npm run lint -w @mirai/api
+      - name: Lint Web
+        run: npm run lint -w @mirai/web
+      - name: Unit tests
+        run: npm run test -w @mirai/api
+      - name: Integration tests
+        run: npm run test:integration -w @mirai/api
+      - name: Build API
+        run: npm run build -w @mirai/api
+      - name: Build Web
+        run: npm run build -w @mirai/web
+      - name: Install Playwright (Chromium)
+        run: npx playwright install chromium --with-deps
+        working-directory: apps/web
+      - name: E2E smoke
+        run: npm run test:e2e -w @mirai/web
+      - name: Audit
+        run: npm audit --workspaces --audit-level=high

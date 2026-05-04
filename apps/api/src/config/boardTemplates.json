@@ -1,0 +1,211 @@
+{
+  "default": {
+    "label": "Blank board",
+    "description": "Generic columns; start from scratch.",
+    "businessType": "general",
+    "defaultStages": ["Backlog", "In Progress", "In Review", "Testing", "Done"],
+    "defaultEstimateMode": null,
+    "sampleTasks": [
+      { "title": "Sample task A", "status": "Backlog", "priority": "P3" },
+      { "title": "Sample task B", "status": "In Progress", "priority": "P2" }
+    ]
+  },
+  "software_development": {
+    "label": "Software development",
+    "description": "Sprint-style flow with review and QA.",
+    "businessType": "software",
+    "defaultStages": ["Backlog", "In Progress", "In Review", "Testing", "Done"],
+    "defaultEstimateMode": "story_points",
+    "sampleTasks": [
+      { "title": "API endpoint", "status": "In Progress", "priority": "P1" },
+      { "title": "Unit tests", "status": "Backlog", "priority": "P2" }
+    ]
+  },
+  "product_management": {
+    "label": "Product management",
+    "description": "Discovery through delivery and launch.",
+    "businessType": "product",
+    "defaultStages": ["Discovery", "Prioritized", "In Development", "Beta", "Released"],
+    "defaultEstimateMode": "story_points",
+    "sampleTasks": [
+      { "title": "PRD draft", "status": "Discovery", "priority": "P2" },
+      { "title": "Stakeholder review", "status": "Prioritized", "priority": "P3" }
+    ]
+  },
+  "marketing": {
+    "label": "Marketing",
+    "description": "Ideas to published campaigns.",
+    "businessType": "marketing",
+    "defaultStages": ["Ideas", "Draft", "Review", "Published", "Done"],
+    "defaultEstimateMode": "hours",
+    "sampleTasks": [
+      { "title": "Blog outline", "status": "Draft", "priority": "P3" },
+      { "title": "Launch checklist", "status": "Ideas", "priority": "P2" }
+    ]
+  },
+  "design": {
+    "label": "Design",
+    "description": "Exploration, design, and handoff.",
+    "businessType": "design",
+    "defaultStages": ["Exploration", "Design", "Review", "Handoff", "Done"],
+    "defaultEstimateMode": "hours",
+    "sampleTasks": [
+      { "title": "Wireframes v1", "status": "Design", "priority": "P2" },
+      { "title": "Design tokens", "status": "Exploration", "priority": "P3" }
+    ]
+  },
+  "project_management": {
+    "label": "Project management",
+    "description": "Plan, execute, monitor, and close.",
+    "businessType": "pm",
+    "defaultStages": ["Planning", "Execution", "Monitoring", "Closure", "Done"],
+    "defaultEstimateMode": "story_points",
+    "sampleTasks": [
+      { "title": "RACI matrix", "status": "Planning", "priority": "P3" },
+      { "title": "Steering deck", "status": "Monitoring", "priority": "P2" }
+    ]
+  },
+  "operations": {
+    "label": "Operations",
+    "description": "Operations triage and resolution.",
+    "businessType": "operations",
+    "defaultStages": ["New", "Triaged", "In Progress", "Waiting", "Resolved"],
+    "defaultEstimateMode": "hours",
+    "sampleTasks": [
+      { "title": "Incident #4401", "status": "New", "priority": "P0" },
+      { "title": "Vendor follow-up", "status": "Waiting", "priority": "P3" }
+    ]
+  },
+  "it_support": {
+    "label": "IT support",
+    "description": "Help desk queue with customer wait state.",
+    "businessType": "it_support",
+    "defaultStages": ["New", "Assigned", "In Progress", "Pending Customer", "Resolved"],
+    "defaultEstimateMode": "hours",
+    "sampleTasks": [
+      { "title": "Laptop swap", "status": "Assigned", "priority": "P2" },
+      { "title": "VPN access", "status": "New", "priority": "P3" }
+    ]
+  },
+  "human_resources": {
+    "label": "Human resources",
+    "description": "HR intake through offer.",
+    "businessType": "hr",
+    "defaultStages": ["Intake", "Review", "Interview", "Offer", "Done"],
+    "defaultEstimateMode": null,
+    "sampleTasks": [
+      { "title": "Open role — engineer", "status": "Intake", "priority": "P3" },
+      { "title": "Screening call", "status": "Interview", "priority": "P2" }
+    ]
+  },
+  "customer_service": {
+    "label": "Customer service",
+    "description": "Tiered support with escalation.",
+    "businessType": "customer_service",
+    "defaultStages": ["New", "Tier 1", "Escalated", "Waiting on Customer", "Resolved"],
+    "defaultEstimateMode": "hours",
+    "sampleTasks": [
+      { "title": "Refund request", "status": "Tier 1", "priority": "P2" },
+      { "title": "Account unlock", "status": "New", "priority": "P3" }
+    ]
+  },
+  "legal": {
+    "label": "Legal",
+    "description": "Legal review and filings.",
+    "businessType": "legal",
+    "defaultStages": ["Intake", "Review", "Approval", "Filed", "Done"],
+    "defaultEstimateMode": null,
+    "sampleTasks": [
+      { "title": "NDA review", "status": "Review", "priority": "P2" },
+      { "title": "Trademark search", "status": "Intake", "priority": "P3" }
+    ]
+  },
+  "finance": {
+    "label": "Finance",
+    "description": "Approvals and audit trail.",
+    "businessType": "finance",
+    "defaultStages": ["Submission", "Approval", "Posted", "Audit", "Done"],
+    "defaultEstimateMode": "hours",
+    "sampleTasks": [
+      { "title": "Vendor invoice #889", "status": "Approval", "priority": "P2" },
+      { "title": "Budget variance", "status": "Submission", "priority": "P3" }
+    ]
+  },
+  "sales": {
+    "label": "Sales",
+    "description": "Pipeline from lead to closed.",
+    "businessType": "sales",
+    "defaultStages": ["Lead", "Qualified", "Proposal", "Negotiation", "Closed"],
+    "defaultEstimateMode": null,
+    "sampleTasks": [
+      { "title": "ACME renewal", "status": "Negotiation", "priority": "P1" },
+      { "title": "Outbound list", "status": "Lead", "priority": "P4" }
+    ]
+  },
+  "data_science": {
+    "label": "Data science",
+    "description": "Experimentation through validated models.",
+    "businessType": "data_science",
+    "defaultStages": ["Backlog", "Analysis", "Model build", "Validation", "Done"],
+    "defaultEstimateMode": "story_points",
+    "sampleTasks": [
+      { "title": "Baseline model", "status": "Model build", "priority": "P2" },
+      { "title": "Dataset prep", "status": "Analysis", "priority": "P3" }
+    ]
+  },
+  "business_finance": {
+    "label": "Business & finance",
+    "description": "Expenses, invoicing, and recurring operational work.",
+    "businessType": "finance",
+    "defaultStages": ["Intake", "In Review", "Approved", "Scheduled", "Closed"],
+    "defaultEstimateMode": "hours",
+    "sampleTasks": [
+      { "title": "Vendor invoice #1042", "status": "In Review", "priority": "P2" },
+      { "title": "Monthly close checklist", "status": "Scheduled", "priority": "P3" },
+      { "title": "Expense report — travel", "status": "Intake", "priority": "P4" }
+    ]
+  },
+  "other": {
+    "label": "Other",
+    "description": "Flexible board when your work does not match a preset.",
+    "businessType": "general",
+    "defaultStages": ["Backlog", "In Progress", "In Review", "Done"],
+    "defaultEstimateMode": null,
+    "sampleTasks": [
+      { "title": "First task", "status": "Backlog", "priority": "P3" }
+    ]
+  },
+  "software_sprint": {
+    "label": "Software sprint (legacy key)",
+    "description": "Alias of Software development.",
+    "businessType": "software",
+    "defaultStages": ["Backlog", "In Progress", "In Review", "Testing", "Done"],
+    "defaultEstimateMode": "story_points",
+    "sampleTasks": [
+      { "title": "Implement API", "status": "In Progress", "priority": "P1" },
+      { "title": "Write tests", "status": "Backlog", "priority": "P2" }
+    ]
+  },
+  "marketing_pipeline": {
+    "label": "Marketing pipeline (legacy key)",
+    "description": "Alias of Marketing.",
+    "businessType": "marketing",
+    "defaultStages": ["Ideas", "Draft", "Review", "Published", "Done"],
+    "defaultEstimateMode": "hours",
+    "sampleTasks": [
+      { "title": "Blog outline", "status": "Draft", "priority": "P3" },
+      { "title": "Social campaign", "status": "Ideas", "priority": "P4" }
+    ]
+  },
+  "ops_triage": {
+    "label": "Ops triage (legacy key)",
+    "description": "Alias of Operations.",
+    "businessType": "operations",
+    "defaultStages": ["New", "Triaged", "In Progress", "Waiting", "Resolved"],
+    "defaultEstimateMode": "hours",
+    "sampleTasks": [
+      { "title": "Ticket #1024", "status": "New", "priority": "P0" },
+      { "title": "Ticket #1025", "status": "Triaged", "priority": "P2" }
+    ]
+  }
+}

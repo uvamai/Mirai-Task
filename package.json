@@ -1,0 +1,20 @@
+{
+  "name": "mirai-tasker",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck -w @mirai/api && npm run typecheck -w @mirai/web",
+    "lint": "npm run lint -w @mirai/api && npm run lint -w @mirai/web",
+    "test": "npm run test -w @mirai/api",
+    "test:integration": "npm run test:integration -w @mirai/api",
+    "migrate": "npm run migrate -w @mirai/api",
+    "build": "npm run build -w @mirai/api && npm run build -w @mirai/web",
+    "verify": "npm run build && npm run typecheck && npm run test",
+    "audit": "npm audit --workspaces --audit-level=high"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

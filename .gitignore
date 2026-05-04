@@ -1,0 +1,20 @@
+node_modules
+dist
+build
+.env
+.env.local
+.env.*.local
+*.log
+logs
+coverage
+storage
+.DS_Store
+.idea
+.vscode
+*.tsbuildinfo
+
+# Playwright / e2e artifacts
+apps/web/test-results/
+
+# Local prompt/reflection notes (not for the remote repo)
+PROMPT-LEARNINGS.local.md

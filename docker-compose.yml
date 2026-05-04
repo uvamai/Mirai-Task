@@ -1,0 +1,72 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mirai
+      POSTGRES_PASSWORD: mirai
+      POSTGRES_DB: mirai_tasker
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mirai -d mirai_tasker"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://mirai:mirai@db:5432/mirai_tasker
+      NODE_ENV: development
+      ALLOW_X_TENANT_ID: "true"
+      STORAGE_DIR: storage
+      # Web UI served by the `web` service (nginx on 8080); keep Vite dev origins too.
+      CORS_ORIGIN: "http://localhost:9080,http://127.0.0.1:9080,http://localhost:5173,http://127.0.0.1:5173"
+      PUBLIC_WEB_URL: "http://localhost:9080"
+    volumes:
+      - ./storage:/app/storage
+    ports:
+      - "127.0.0.1:4000:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "127.0.0.1:9080:80"
+    depends_on:
+      api:
+        condition: service_started
+
+  worker:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://mirai:mirai@db:5432/mirai_tasker
+      NODE_ENV: development
+      STORAGE_DIR: storage
+    command: ["node", "dist/worker.js"]
+    volumes:
+      - ./storage:/app/storage
+    depends_on:
+      api:
+        condition: service_started
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
