@@ -2,6 +2,7 @@ import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
 import { apiFetch } from '../../api/client';
 import type { CustomFieldDef } from './types';
+import { useTagCatalog } from '../../hooks/useTagCatalog';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -34,8 +35,10 @@ export function TaskCreateModal({
   onClose,
   onCreated,
 }: Props) {
+  const UX_TAG = 'UI/UX improvement';
+  const tagCatalogQ = useTagCatalog();
+  const catalog = tagCatalogQ.data ?? [];
   if (!open) return null;
-
   const defaultStatus = columns[0] ?? 'Backlog';
   const label =
     estimateMode === 'hours' ? 'Estimate (hours, 0.5 steps)' : 'Estimate (story points, whole numbers)';
@@ -69,6 +72,8 @@ export function TaskCreateModal({
             estimate: '' as string | number,
             dueDate: '' as string,
             parentTaskId: '',
+            tagUx: false,
+            tagsText: '',
             metadata: initialMeta,
           }}
           validationSchema={Yup.object({
@@ -100,6 +105,14 @@ export function TaskCreateModal({
                 ? String(values.dueDate).slice(0, 10)
                 : null;
             const pt = String(values.parentTaskId ?? '').trim();
+            const parsedTags = String(values.tagsText ?? '')
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean)
+              .slice(0, 10);
+            const tagsOut = Array.from(
+              new Set([...(values.tagUx ? [UX_TAG] : []), ...parsedTags].map((s) => s.trim()).filter(Boolean))
+            ).slice(0, 10);
             const res = await apiFetch(`/boards/${boardId}/tasks`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -108,7 +121,7 @@ export function TaskCreateModal({
                 description: values.description || null,
                 priority: values.priority,
                 status: values.status,
-                tags: [],
+                tags: tagsOut,
                 estimate: values.estimate === '' ? null : Number(values.estimate),
                 dueDate: due,
                 metadata: metaOut,
@@ -138,6 +151,27 @@ export function TaskCreateModal({
                   as="textarea"
                   name="description"
                   rows={3}
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600">Tags</label>
+                <label className="mt-2 flex items-center gap-2 text-sm text-slate-700">
+                  <Field type="checkbox" name="tagUx" />
+                  {UX_TAG}
+                </label>
+                {catalog.length > 0 && (
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Available tags: {catalog.map((t) => t.name).slice(0, 8).join(', ')}
+                    {catalog.length > 8 ? '…' : ''}
+                  </p>
+                )}
+                <label className="mt-2 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  Add tags (comma-separated)
+                </label>
+                <Field
+                  name="tagsText"
+                  placeholder="e.g. UI/UX improvement, backlog hygiene"
                   className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
                 />
               </div>

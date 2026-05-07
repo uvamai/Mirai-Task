@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
 import { apiFetch, apiJson } from '../../api/client';
 import type { ActivityRow, CustomFieldDef, EmployeeOption, TaskRow } from './types';
 import { SlaCountdown } from './SlaCountdown';
+import { TagPill } from '../../components/TagPill';
+import { useTagCatalog } from '../../hooks/useTagCatalog';
 
 function estimateSchema(mode: 'story_points' | 'hours') {
   if (mode === 'hours') {
@@ -76,12 +78,20 @@ export function TaskDetailPanel({
 }: Props) {
   const qc = useQueryClient();
   const canManage = membershipRole === 'ADMIN' || membershipRole === 'MANAGER';
+  const tagCatalogQ = useTagCatalog();
+  const catalog = tagCatalogQ.data ?? [];
+  const [tagInput, setTagInput] = useState('');
 
   const detailQ = useQuery({
     queryKey: ['task', taskId],
     enabled: Boolean(taskId),
     queryFn: () => apiJson<DetailResponse>(`/tasks/${taskId}`),
   });
+
+  const tags = useMemo(
+    () => (detailQ.data?.task?.tags ?? []).filter((t) => typeof t === 'string' && t.trim()),
+    [detailQ.data?.task?.tags]
+  );
 
   const employeesQ = useQuery({
     queryKey: ['employees-picker'],
@@ -183,20 +193,108 @@ export function TaskDetailPanel({
   const paused =
     task?.slaState && typeof task.slaState === 'object' && 'paused' in task.slaState && (task.slaState as { paused?: boolean }).paused;
 
+  function addTag(raw: string) {
+    const t = raw.trim();
+    if (!t) return;
+    const next = Array.from(new Set([...tags, t])).slice(0, 10);
+    patchTask.mutate({ tags: next });
+    setTagInput('');
+  }
+
+  function removeTag(raw: string) {
+    const t = raw.trim();
+    const next = tags.filter((x) => x.toLowerCase() !== t.toLowerCase());
+    patchTask.mutate({ tags: next });
+  }
+
   return (
-    <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-white/50 bg-white/95 shadow-2xl backdrop-blur-md">
-      <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-        <h2 className="text-sm font-bold text-slate-900">Task detail</h2>
-        <button type="button" className="text-sm text-slate-600 hover:text-slate-900" onClick={onClose}>
-          Close
-        </button>
+    <>
+      <div
+        className="fixed inset-0 z-40 bg-slate-900/35 backdrop-blur-[1px] sm:hidden"
+        role="presentation"
+        onMouseDown={onClose}
+      />
+      <div className="glass-panel fixed inset-y-0 right-0 z-50 flex w-full sm:max-w-md flex-col border-l border-white/40">
+      <div className="flex items-center justify-between gap-2 border-b border-white/40 px-4 py-3">
+        <div className="min-w-0">
+          <h2 className="truncate text-sm font-bold text-slate-900">{task ? `${task.key} · ${task.title}` : 'Task detail'}</h2>
+          <div className="mt-0.5 text-[11px] font-medium text-slate-500">Inspector</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="rounded-full border border-white/70 bg-white/55 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-white/70"
+            onClick={() => alert('Share link (coming soon)')}
+          >
+            Share
+          </button>
+          <button type="button" className="text-sm font-semibold text-slate-600 hover:text-slate-900" onClick={onClose}>
+            ✕
+          </button>
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto p-4">
         {detailQ.isLoading && <p className="text-sm text-slate-600">Loading…</p>}
         {detailQ.isError && <p className="text-sm text-rose-700">Could not load task.</p>}
         {task && (
           <div className="space-y-6">
-            <p className="text-xs font-semibold text-indigo-700">{task.key}</p>
+            {(task.tags?.length ?? 0) > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {task.tags!.map((t) => (
+                  <TagPill key={t} tag={t} />
+                ))}
+              </div>
+            )}
+            {canEditFields && (
+              <div className="glass-card rounded-xl p-3">
+                <p className="text-[10px] font-bold uppercase text-slate-500">Tags</p>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {tags.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => removeTag(t)}
+                      className="rounded"
+                      title="Remove tag"
+                    >
+                      <TagPill tag={t} />
+                    </button>
+                  ))}
+                  {tags.length === 0 && <span className="text-xs text-slate-500">No tags</span>}
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <input
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    placeholder="Add tag…"
+                    className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addTag(tagInput);
+                      }
+                    }}
+                    list="mirai-tag-suggestions"
+                  />
+                  <button
+                    type="button"
+                    disabled={!tagInput.trim() || patchTask.isPending}
+                    onClick={() => addTag(tagInput)}
+                    className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    Add
+                  </button>
+                </div>
+                {catalog.length > 0 && (
+                  <datalist id="mirai-tag-suggestions">
+                    {catalog.map((t) => (
+                      <option key={t.name} value={t.name} />
+                    ))}
+                  </datalist>
+                )}
+                <p className="mt-1 text-[11px] text-slate-500">Tip: click a tag to remove it.</p>
+              </div>
+            )}
 
             {(task.parent || (task.subtasks && task.subtasks.length > 0)) && (
               <div className="rounded-lg border border-slate-100 bg-slate-50/80 p-2 text-xs text-slate-700">
@@ -585,6 +683,7 @@ export function TaskDetailPanel({
         )}
       </div>
     </div>
+    </>
   );
 }
 

@@ -6,6 +6,8 @@ type IntakeConfig = {
   tenantName: string;
   projectName: string;
   requestTypes: { key: string; label: string; defaultPriority: string }[];
+  /** When set, new tasks are filed on this board. */
+  intakeBoardName?: string | null;
   captchaRequired: boolean;
 };
 
@@ -115,7 +117,14 @@ export function PublicIntakePage() {
       <div className="mx-auto max-w-lg rounded-2xl border border-white/60 bg-white/90 p-6 shadow-lg backdrop-blur-md">
         <h1 className="text-xl font-bold text-slate-900">{cfg.projectName}</h1>
         <p className="text-sm text-slate-500">{cfg.tenantName}</p>
-        <p className="mt-3 text-xs text-slate-600">Submit a request. You will not need to sign in.</p>
+        <p className="mt-3 text-xs text-slate-600">
+          Submit a request or product feedback. You will not need to sign in.
+          {cfg.intakeBoardName ? (
+            <span className="mt-1 block text-slate-500">
+              New items are filed on the board: <span className="font-semibold text-slate-700">{cfg.intakeBoardName}</span>
+            </span>
+          ) : null}
+        </p>
 
         {submit.isSuccess && (
           <p className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900">

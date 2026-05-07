@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useMemo, useState } from 'react';
 import { apiJson } from '../api/client';
+import { TagPill } from '../components/TagPill';
 
 type Row = {
   id: string;
@@ -10,6 +11,7 @@ type Row = {
   status: string;
   priority: string;
   dueDate: string | null;
+  tags?: string[];
   projectId: string;
   boardId: string;
   projectName: string;
@@ -79,6 +81,11 @@ export function MyWorkPage() {
                 <span>
                   <span className="font-semibold text-indigo-700">{t.key}</span>
                   <span className="text-slate-900"> — {t.title}</span>
+                  {(t.tags ?? []).slice(0, 2).map((tag) => (
+                    <span key={tag} className="ml-2">
+                      <TagPill tag={tag} />
+                    </span>
+                  ))}
                 </span>
                 <span className="text-xs text-slate-600">
                   {t.projectName} · {t.status} · {t.priority}

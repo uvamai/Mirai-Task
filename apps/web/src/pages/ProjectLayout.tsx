@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiJson } from '../api/client';
 import { useState } from 'react';
 import { CreateBoardModal } from './CreateBoardModal';
+import { ProjectHeader } from '../components/project/ProjectHeader';
+import { ProjectTabs } from '../components/project/ProjectTabs';
 
 type ProjectRow = {
   id: string;
@@ -19,7 +21,8 @@ export function ProjectLayout() {
 
   const meQ = useQuery({
     queryKey: ['me-project-layout'],
-    queryFn: () => apiJson<{ membership: { role: string } }>('/auth/me'),
+    queryFn: () =>
+      apiJson<{ membership: { role: string }; tenant: { id: string; name: string } | null }>('/auth/me'),
   });
 
   const pq = useQuery({
@@ -29,113 +32,120 @@ export function ProjectLayout() {
 
   const project = pq.data?.projects.find((p) => p.id === projectId);
   const boards = project?.boards ?? [];
+  const projectMissing =
+    Boolean(projectId) && pq.isSuccess && !pq.isFetching && project === undefined;
   const role = meQ.data?.membership.role ?? '';
   const canManage = ['ADMIN', 'MANAGER'].includes(role);
   const isAdmin = role === 'ADMIN';
   const defaultBoardId = boards[0]?.id;
   const activeBoardId = boardId ?? defaultBoardId;
+  const activeBoardName = boards.find((b) => b.id === activeBoardId)?.name ?? (boards[0]?.name ?? 'Board');
 
   return (
     <div className="space-y-0">
-      <div className="sticky top-0 z-20 -mx-6 border-b border-white/40 bg-white/80 px-6 py-3 shadow-[0_8px_30px_rgb(0,0,0,0.06)] backdrop-blur-md">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <Link to="/app" className="text-xs font-semibold text-indigo-700">
-              ← Projects
-            </Link>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900">{project?.name ?? 'Project'}</h1>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {boards.map((b) => (
+      {projectMissing && (
+        <div
+          className="mx-auto mb-4 max-w-6xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+          role="alert"
+        >
+          <p className="font-semibold">This project is not in your current workspace.</p>
+          <p className="mt-1 text-amber-900/90">
+            You are signed into <strong>{meQ.data?.tenant?.name ?? 'an organization'}</strong>
+            {meQ.data?.tenant?.id ? (
+              <>
+                {' '}
+                (<span className="font-mono text-xs">{meQ.data.tenant.id}</span>)
+              </>
+            ) : null}
+            . The UVAMAI project lives under a different organization if your account has more than one.
+          </p>
+          <p className="mt-2">
+            <strong>Fix:</strong> sign out, then sign in again and choose the correct workspace. If you use multiple
+            tenants, open{' '}
+            <Link className="font-semibold text-indigo-800 underline" to="/login">
+              Sign in
+            </Link>{' '}
+            with{' '}
+            <code className="rounded bg-white/80 px-1 py-0.5 text-xs">
+              ?tenantId=&lt;workspace-uuid&gt;
+            </code>{' '}
+            (see docs) or ask an admin to add you to this project.
+          </p>
+        </div>
+      )}
+      <div className="border-b border-white/50 bg-white/60 px-6 py-4 shadow-sm backdrop-blur-xl">
+        <div className="mx-auto max-w-6xl space-y-3">
+          <ProjectHeader projectName={project?.name ?? 'Project'} />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <ProjectTabs projectId={projectId ?? ''} activeBoardId={activeBoardId} />
+              {boards.length > 0 && projectId && (
+                <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white/70 px-3 py-2">
+                  <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Board</span>
+                  <select
+                    value={activeBoardId ?? ''}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      if (!next) return;
+                      // hard navigate via location so we don't need a hook here
+                      window.location.href = `/app/projects/${projectId}/boards/${encodeURIComponent(next)}`;
+                    }}
+                    className="max-w-[240px] truncate bg-transparent text-sm font-semibold text-slate-800 outline-none"
+                    aria-label="Select board"
+                  >
+                    {boards.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-[10px] font-semibold text-slate-500" title={activeBoardName}>
+                    {activeBoardName}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => setCreateBoardOpen(true)}
+                  className="rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-white"
+                >
+                  + Board
+                </button>
+              )}
+              {isAdmin && (
+                <NavLink
+                  to={`/app/projects/${projectId}/settings`}
+                  className={({ isActive }) =>
+                    `rounded-xl px-3 py-2 text-sm font-semibold ${
+                      isActive ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white/80 text-slate-700 hover:bg-white'
+                    }`
+                  }
+                >
+                  Intake
+                </NavLink>
+              )}
               <NavLink
-                key={b.id}
-                to={`/app/projects/${projectId}/boards/${b.id}`}
+                to={`/app/projects/${projectId}/reports${boardId ? `?boardId=${encodeURIComponent(boardId)}` : ''}`}
                 className={({ isActive }) =>
-                  `rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-                    isActive
-                      ? 'bg-slate-900 text-white shadow-md ring-1 ring-slate-900/20'
-                      : 'bg-white/80 text-slate-700 ring-1 ring-slate-200/80 hover:bg-white'
+                  `rounded-xl px-3 py-2 text-sm font-semibold ${
+                    isActive ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white/80 text-slate-700 hover:bg-white'
                   }`
                 }
               >
-                {b.name}
+                Reports
               </NavLink>
-            ))}
-            {canManage && (
-              <button
-                type="button"
-                onClick={() => setCreateBoardOpen(true)}
-                className="rounded-lg border border-dashed border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:border-slate-500 hover:text-slate-900"
-              >
-                + Board
-              </button>
-            )}
+            </div>
           </div>
         </div>
-        <nav className="mt-3 flex flex-wrap gap-4 border-t border-white/60 pt-2 text-sm font-semibold text-slate-600">
-          <NavLink
-            end
-            to={activeBoardId ? `/app/projects/${projectId}/boards/${activeBoardId}` : '#'}
-            className={({ isActive }) => (isActive ? 'text-indigo-800' : 'hover:text-slate-900')}
-            onClick={(e) => {
-              if (!activeBoardId) e.preventDefault();
-            }}
-          >
-            Board
-          </NavLink>
-          <NavLink
-            to={activeBoardId ? `/app/projects/${projectId}/boards/${activeBoardId}/list` : '#'}
-            className={({ isActive }) => (isActive ? 'text-indigo-800' : 'hover:text-slate-900')}
-            onClick={(e) => {
-              if (!activeBoardId) e.preventDefault();
-            }}
-          >
-            List
-          </NavLink>
-          <NavLink
-            to={activeBoardId ? `/app/projects/${projectId}/boards/${activeBoardId}/calendar` : '#'}
-            className={({ isActive }) => (isActive ? 'text-indigo-800' : 'hover:text-slate-900')}
-            onClick={(e) => {
-              if (!activeBoardId) e.preventDefault();
-            }}
-          >
-            Calendar
-          </NavLink>
-          {canManage && (
-            <NavLink
-              to={`/app/projects/${projectId}/team`}
-              className={({ isActive }) => (isActive ? 'text-indigo-800' : 'hover:text-slate-900')}
-            >
-              Team
-            </NavLink>
-          )}
-          {isAdmin && (
-            <NavLink
-              to={`/app/projects/${projectId}/settings`}
-              className={({ isActive }) => (isActive ? 'text-indigo-800' : 'hover:text-slate-900')}
-            >
-              ITSM intake
-            </NavLink>
-          )}
-          {isAdmin && (
-            <NavLink
-              to={`/app/projects/${projectId}/automations`}
-              className={({ isActive }) => (isActive ? 'text-indigo-800' : 'hover:text-slate-900')}
-            >
-              Automations
-            </NavLink>
-          )}
-          <NavLink
-            to={`/app/projects/${projectId}/reports${boardId ? `?boardId=${encodeURIComponent(boardId)}` : ''}`}
-            className={({ isActive }) => (isActive ? 'text-indigo-800' : 'hover:text-slate-900')}
-          >
-            Reports
-          </NavLink>
-        </nav>
       </div>
 
-      <div className="pt-6">
-        <Outlet />
+      <div className="px-6 py-6">
+        <div className="mx-auto max-w-6xl">
+          <Outlet />
+        </div>
       </div>
 
       {projectId && (

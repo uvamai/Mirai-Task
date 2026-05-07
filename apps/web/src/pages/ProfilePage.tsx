@@ -2,6 +2,28 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { apiFetch, apiJson } from '../api/client';
 
+/** IANA zones for quiet-hours interpretation (extend as needed). */
+const QUIET_HOUR_TIMEZONES = [
+  'UTC',
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'America/Toronto',
+  'America/Vancouver',
+  'America/Sao_Paulo',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'Asia/Dubai',
+  'Asia/Kolkata',
+  'Asia/Singapore',
+  'Asia/Tokyo',
+  'Asia/Seoul',
+  'Australia/Sydney',
+  'Pacific/Auckland',
+] as const;
+
 type Me = {
   user: { email: string; firstName: string; lastName: string };
   tenant: { name: string; slug: string } | null;
@@ -21,6 +43,7 @@ export function ProfilePage() {
   const [mentions, setMentions] = useState(true);
   const [quietStart, setQuietStart] = useState('');
   const [quietEnd, setQuietEnd] = useState('');
+  const [quietTz, setQuietTz] = useState('');
 
   useEffect(() => {
     const p = q.data?.preferences ?? {};
@@ -31,6 +54,7 @@ export function ProfilePage() {
     setMentions(not?.mentions !== false);
     setQuietStart(typeof not?.quietHoursStart === 'string' ? not.quietHoursStart : '');
     setQuietEnd(typeof not?.quietHoursEnd === 'string' ? not.quietHoursEnd : '');
+    setQuietTz(typeof not?.quietHoursTimezone === 'string' ? not.quietHoursTimezone : '');
   }, [q.data?.preferences]);
 
   const savePrefs = useMutation({
@@ -46,9 +70,9 @@ export function ProfilePage() {
             notifications: {
               dueReminders,
               mentions,
-              ...(quietStart.trim() && quietEnd.trim()
-                ? { quietHoursStart: quietStart.trim(), quietHoursEnd: quietEnd.trim() }
-                : {}),
+              quietHoursStart: quietStart.trim() || null,
+              quietHoursEnd: quietEnd.trim() || null,
+              quietHoursTimezone: quietTz.trim() || null,
             },
           },
         }),
@@ -107,7 +131,25 @@ export function ProfilePage() {
                 <input type="checkbox" checked={mentions} onChange={(e) => setMentions(e.target.checked)} />
                 @mention alerts in comments
               </label>
-              <p className="text-[10px] text-slate-500">Quiet hours use UTC (optional).</p>
+              <p className="text-[10px] text-slate-500">
+                Quiet hours suppress in-app due reminders, SLA alerts, and @mention notifications during the window. Times
+                are interpreted in the timezone below; leave empty for UTC.
+              </p>
+              <label className="mt-1 block text-xs text-slate-600">
+                Quiet hours timezone
+                <select
+                  value={quietTz}
+                  onChange={(e) => setQuietTz(e.target.value)}
+                  className="mt-0.5 block w-full max-w-md rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                >
+                  <option value="">UTC (default)</option>
+                  {QUIET_HOUR_TIMEZONES.filter((z) => z !== 'UTC').map((z) => (
+                    <option key={z} value={z}>
+                      {z.replace(/_/g, ' ')}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <div className="flex flex-wrap gap-2">
                 <label className="text-xs text-slate-600">
                   Quiet start

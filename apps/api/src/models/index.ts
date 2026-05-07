@@ -20,6 +20,7 @@ import { TaskComment } from './TaskComment';
 import { UserNotification } from './UserNotification';
 import { RecurringTaskRule } from './RecurringTaskRule';
 import { ContactSalesLead } from './ContactSalesLead';
+import { TaskRelation } from './TaskRelation';
 
 User.hasMany(TenantMembership, { foreignKey: 'userId' });
 TenantMembership.belongsTo(User, { foreignKey: 'userId' });
@@ -70,6 +71,17 @@ Project.hasMany(Task, { foreignKey: 'projectId' });
 Task.belongsTo(Project, { foreignKey: 'projectId' });
 Board.hasMany(Task, { foreignKey: 'boardId' });
 Task.belongsTo(Board, { foreignKey: 'boardId' });
+
+// Task-to-task relations (many-to-many, symmetric via normalized pairs).
+Task.hasMany(TaskRelation, { foreignKey: 'fromTaskId', as: 'OutgoingRelations' });
+Task.hasMany(TaskRelation, { foreignKey: 'toTaskId', as: 'IncomingRelations' });
+TaskRelation.belongsTo(Task, { foreignKey: 'fromTaskId', as: 'FromTask' });
+TaskRelation.belongsTo(Task, { foreignKey: 'toTaskId', as: 'ToTask' });
+
+Tenant.hasMany(TaskRelation, { foreignKey: 'tenantId' });
+TaskRelation.belongsTo(Tenant, { foreignKey: 'tenantId' });
+Project.hasMany(TaskRelation, { foreignKey: 'projectId' });
+TaskRelation.belongsTo(Project, { foreignKey: 'projectId' });
 
 User.hasMany(Task, { foreignKey: 'createdBy' });
 Task.belongsTo(User, { foreignKey: 'createdBy' });
@@ -131,4 +143,5 @@ export {
   UserNotification,
   RecurringTaskRule,
   ContactSalesLead,
+  TaskRelation,
 };

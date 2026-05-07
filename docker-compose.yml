@@ -8,7 +8,8 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "127.0.0.1:55432:5432"
+      # Host port avoids Windows Hyper-V excluded ranges (55432 was in 55360–55459).
+      - "127.0.0.1:15432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U mirai -d mirai_tasker"]
       interval: 5s

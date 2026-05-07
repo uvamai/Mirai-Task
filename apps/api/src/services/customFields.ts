@@ -45,6 +45,14 @@ const RESERVED_METADATA: Record<string, Joi.Schema> = {
     )
     .max(100)
     .allow(null),
+  /** Sync anchor for docs/ROADMAP-TODOS.md → boards (see scripts/seed-roadmap-tasks.mjs). */
+  roadmap: Joi.object({
+    uid: Joi.string().max(128).required(),
+    group: Joi.string().valid('T', 'P', 'A', 'M').required(),
+    source: Joi.string().max(512).allow(null, ''),
+    roadmapStatus: Joi.string().max(64).allow(null, ''),
+    syncedAt: Joi.string().isoDate().allow(null, ''),
+  }).allow(null),
 };
 
 export function buildMetadataValidator(defs: CustomFieldDef[]) {

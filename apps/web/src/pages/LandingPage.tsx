@@ -39,8 +39,10 @@ export function LandingPage() {
             SLA-aware Kanban for teams that need audit-ready delivery.
           </h1>
           <p className="max-w-xl text-lg text-slate-600">
-            Per-tenant subscriptions, project limits, and enterprise guardrails—designed for local-first
-            development and production parity.
+            Per-tenant subscriptions and project limits. The dedicated AI/automation board, agent handoffs, and
+            approval-gated execution are{' '}
+            <span className="font-semibold text-slate-800">Enterprise-only on an active subscription</span>—with
+            local-first development and production parity.
           </p>
           <div className="flex flex-wrap gap-4">
             <Link
@@ -68,7 +70,8 @@ export function LandingPage() {
           <ul className="mt-6 space-y-4 text-slate-700">
             {[
               'Tenant isolation with subscription enforcement',
-              'Immutable audit trail and agent-ready APIs (roadmap)',
+              'Enterprise subscription unlocks the automation board, agent queue, and governed execution (roadmap)',
+              'Immutable audit trail and APIs designed for agent integrations',
               'Glass + neumorphic UI system for consistent polish',
             ].map((item) => (
               <li
@@ -88,7 +91,8 @@ export function LandingPage() {
           <h2 className="mt-2 text-3xl font-bold text-slate-900 md:text-4xl">Pick the plan that fits your team</h2>
           <p className="mt-2 max-w-3xl text-slate-600">
             Starter is free forever. Standard and Pro pricing are published below, and checkout for those tiers will
-            be enabled once payments go live.
+            be enabled once payments go live. Pro includes schedule-based recurring tasks and SLA tooling—not the
+            Enterprise AI automation board.
           </p>
           <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             {planAvailabilityNotice}

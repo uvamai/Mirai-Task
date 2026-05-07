@@ -4,6 +4,9 @@ build
 .env
 .env.local
 .env.*.local
+.env.roadmap
+.env.example
+.env.*.example
 *.log
 logs
 coverage
@@ -18,3 +21,6 @@ apps/web/test-results/
 
 # Local prompt/reflection notes (not for the remote repo)
 PROMPT-LEARNINGS.local.md
+
+# Design reference assets (not shipped)
+design/

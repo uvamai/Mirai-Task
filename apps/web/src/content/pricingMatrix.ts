@@ -51,12 +51,12 @@ export const planMatrix: PlanMatrixItem[] = [
     name: 'Pro',
     headlinePrice: '$9',
     subPrice: 'per user / month',
-    description: 'Operational scale with automation and SLA controls.',
+    description: 'Operational scale: SLA, reminders, and schedule-based recurring tasks.',
     features: [
       '100 users included (expandable)',
       'Up to 100 projects',
       'Up to 200,000 tasks',
-      'Recurring tasks + reminder engine',
+      'Recurring tasks (per board) + reminder engine',
       'SLA defaults by priority',
       'My Work cross-board queue',
       'Org custom templates',
@@ -69,13 +69,14 @@ export const planMatrix: PlanMatrixItem[] = [
     code: 'enterprise',
     name: 'Enterprise',
     headlinePrice: 'Contact Sales',
-    description: 'Governance, compliance, and contractual scale.',
+    description: 'Governance, compliance, and AI automation on your subscription.',
     features: [
-      'Contractual limits',
+      'Everything implied by contractual Enterprise subscription',
+      'Dedicated AI/automation board per project + agent review queue',
+      'Approve & Execute gate and automation phase visibility (roadmap)',
       'Dedicated support channel + custom SLA',
       'Compliance and legal-hold workflows',
       'Advanced integration and governance controls',
-      'Enterprise onboarding and solutioning',
     ],
     ctaLabel: 'Contact Sales',
     ctaHref: '/contact-sales',
@@ -84,4 +85,4 @@ export const planMatrix: PlanMatrixItem[] = [
 ];
 
 export const planAvailabilityNotice =
-  'Only Starter and Enterprise are available right now. Standard and Pro checkout will be enabled once payments are live.';
+  'Only Starter and Enterprise are available right now. Standard and Pro checkout will be enabled once payments are live. The AI/automation board and agent execution features require Enterprise with an active subscription.';

@@ -202,6 +202,7 @@ const patchProjectSettingsSchema = Joi.object({
   publicIntake: Joi.object({
     enabled: Joi.boolean(),
     requestTypes: Joi.array().items(publicIntakeItemSchema).max(30),
+    targetBoardId: Joi.string().uuid().allow(null, ''),
   }).optional(),
 });
 
@@ -254,14 +255,29 @@ projectsRouter.patch(
       const pi = value.publicIntake as {
         enabled?: boolean;
         requestTypes?: { key: string; label: string; defaultPriority?: string }[];
+        targetBoardId?: string | null;
       };
       if (pi.enabled === true && (!pi.requestTypes || pi.requestTypes.length < 1)) {
         res.status(400).json({ error: 'publicIntake.requestTypes is required when publicIntake.enabled is true' });
         return;
       }
       const prios = new Set(['P0', 'P1', 'P2', 'P3', 'P4']);
+      let resolvedTargetBoardId: string | null = null;
+      const rawTarget = pi.targetBoardId;
+      if (rawTarget != null && String(rawTarget).trim() !== '') {
+        const tid = String(rawTarget).trim();
+        const intakeBoard = await Board.findOne({
+          where: { id: tid, projectId: project.id, tenantId: req.tenantId! },
+        });
+        if (!intakeBoard) {
+          res.status(400).json({ error: 'publicIntake.targetBoardId must reference a board in this project' });
+          return;
+        }
+        resolvedTargetBoardId = tid;
+      }
       const sanitized = {
-        ...pi,
+        enabled: pi.enabled === true,
+        targetBoardId: resolvedTargetBoardId,
         requestTypes: (pi.requestTypes ?? []).map((r) => ({
           key: slugifyPublicIntakeKey(r.key),
           label: String(r.label ?? '')
