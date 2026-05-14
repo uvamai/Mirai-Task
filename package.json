@@ -5,6 +5,8 @@
     "apps/*"
   ],
   "scripts": {
+    "dev": "concurrently \"npm run dev -w @mirai/api\" \"npm run dev -w @mirai/web\"",
+    "dev:full": "concurrently \"npm run dev -w @mirai/api\" \"npm run dev:worker -w @mirai/api\" \"npm run dev -w @mirai/web\"",
     "typecheck": "npm run typecheck -w @mirai/api && npm run typecheck -w @mirai/web",
     "lint": "npm run lint -w @mirai/api && npm run lint -w @mirai/web",
     "test": "npm run test -w @mirai/api",
@@ -16,5 +18,8 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }
