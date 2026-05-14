@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useRecentNavigation } from '../../hooks/useRecentNavigation';
 import { boardShellAppPath } from '../../hooks/useBoardShellView';
+import { menuBelowTrigger } from './floatingMenuGeometry';
 
 export type BoardOption = { id: string; name: string };
 
@@ -35,6 +37,7 @@ export function BoardSwitcher({
   const rootRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const [menuBox, setMenuBox] = useState<CSSProperties | null>(null);
   const { push: pushRecent } = useRecentNavigation();
 
   /** Pre-select the active board's index when the menu opens. */
@@ -46,11 +49,31 @@ export function BoardSwitcher({
 
   useFocusTrap(menuRef, open);
 
-  /** Close on outside click. */
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuBox(null);
+      return;
+    }
+    const sync = () => {
+      if (!buttonRef.current) return;
+      setMenuBox(menuBelowTrigger(buttonRef.current, { minWidth: 260, maxWidth: 360 }));
+    };
+    sync();
+    window.addEventListener('resize', sync);
+    document.addEventListener('scroll', sync, true);
+    return () => {
+      window.removeEventListener('resize', sync);
+      document.removeEventListener('scroll', sync, true);
+    };
+  }, [open]);
+
+  /** Close on outside click (menu is portaled outside `rootRef`). */
   useEffect(() => {
     if (!open) return;
     function onDocClick(e: MouseEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (rootRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setOpen(false);
     }
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
@@ -137,72 +160,77 @@ export function BoardSwitcher({
         </svg>
       </button>
 
-      {open && (
-        <div
-          ref={menuRef}
-          role="listbox"
-          aria-label="Boards in this project"
-          tabIndex={-1}
-          onKeyDown={onMenuKey}
-          className="absolute left-0 top-[calc(100%+0.4rem)] z-40 w-[min(360px,80vw)] rounded-2xl border border-white/60 bg-white p-1.5 shadow-2xl ring-1 ring-slate-200/60"
-        >
-          <div className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">
-            Boards · {boards.length}
-          </div>
-          <ul className="max-h-[60vh] overflow-y-auto">
-            {boards.map((b, idx) => {
-              const isActive = b.id === activeBoardId;
-              const isCursor = idx === activeIndex;
-              return (
-                <li key={b.id}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={isActive}
-                    onMouseEnter={() => setActiveIndex(idx)}
-                    onClick={() => go(b)}
-                    className={`flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold transition ${
-                      isCursor ? 'bg-indigo-600 text-white' : 'text-slate-800 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="min-w-0 flex-1 truncate" title={b.name}>
-                      {b.name}
-                    </span>
-                    {isActive && (
-                      <span
-                        className={`shrink-0 rounded-lg px-1.5 py-0.5 text-[10px] font-bold uppercase ${
-                          isCursor ? 'bg-white/25 text-white' : 'bg-emerald-100 text-emerald-900'
-                        }`}
-                      >
-                        Active
+      {open &&
+        menuBox &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="listbox"
+            aria-label="Boards in this project"
+            tabIndex={-1}
+            onKeyDown={onMenuKey}
+            style={menuBox}
+            className="rounded-2xl border border-white/60 bg-white p-1.5 shadow-2xl ring-1 ring-slate-200/60"
+          >
+            <div className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+              Boards · {boards.length}
+            </div>
+            <ul>
+              {boards.map((b, idx) => {
+                const isActive = b.id === activeBoardId;
+                const isCursor = idx === activeIndex;
+                return (
+                  <li key={b.id}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={isActive}
+                      onMouseEnter={() => setActiveIndex(idx)}
+                      onClick={() => go(b)}
+                      className={`flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold transition ${
+                        isCursor ? 'bg-indigo-600 text-white' : 'text-slate-800 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="min-w-0 flex-1 truncate" title={b.name}>
+                        {b.name}
                       </span>
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-            {boards.length === 0 && (
-              <li className="px-3 py-3 text-xs text-slate-500">No boards yet.</li>
+                      {isActive && (
+                        <span
+                          className={`shrink-0 rounded-lg px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                            isCursor ? 'bg-white/25 text-white' : 'bg-emerald-100 text-emerald-900'
+                          }`}
+                        >
+                          Active
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+              {boards.length === 0 && (
+                <li className="px-3 py-3 text-xs text-slate-500">No boards yet.</li>
+              )}
+            </ul>
+            {canManage && (
+              <>
+                <div className="my-1 h-px bg-slate-200" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    onCreateBoard();
+                  }}
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-indigo-800 hover:bg-indigo-50"
+                >
+                  <span className="text-base leading-none">＋</span>
+                  New board…
+                </button>
+              </>
             )}
-          </ul>
-          {canManage && (
-            <>
-              <div className="my-1 h-px bg-slate-200" />
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  onCreateBoard();
-                }}
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-indigo-800 hover:bg-indigo-50"
-              >
-                <span className="text-base leading-none">＋</span>
-                New board…
-              </button>
-            </>
-          )}
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

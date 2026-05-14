@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
+import { menuBelowTrigger } from './floatingMenuGeometry';
 
 const FAV_KEY = 'mirai_favorite_project_ids';
 
@@ -33,10 +35,29 @@ export function ProjectHeader({
   isAdmin: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuBox, setMenuBox] = useState<CSSProperties | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(() => loadFavoriteSet());
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   useFocusTrap(menuRef, menuOpen);
+
+  useLayoutEffect(() => {
+    if (!menuOpen) {
+      setMenuBox(null);
+      return;
+    }
+    const sync = () => {
+      if (!menuBtnRef.current) return;
+      setMenuBox(menuBelowTrigger(menuBtnRef.current, { minWidth: 220, maxWidth: 320 }));
+    };
+    sync();
+    window.addEventListener('resize', sync);
+    document.addEventListener('scroll', sync, true);
+    return () => {
+      window.removeEventListener('resize', sync);
+      document.removeEventListener('scroll', sync, true);
+    };
+  }, [menuOpen]);
 
   const isFavorite = favorites.has(projectId);
 
@@ -93,7 +114,7 @@ export function ProjectHeader({
           <h1 className="truncate text-xl font-bold tracking-tight text-slate-900">{projectName}</h1>
         </div>
       </div>
-      <div className="relative flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={toggleFavorite}
@@ -118,71 +139,76 @@ export function ProjectHeader({
         >
           •••
         </button>
-        {menuOpen && (
-          <div
-            ref={menuRef}
-            role="menu"
-            className="absolute right-0 top-[calc(100%+0.35rem)] z-50 min-w-[220px] rounded-xl border border-slate-200 bg-white py-1 shadow-xl"
-          >
-            <button
-              type="button"
-              role="menuitem"
-              className="block w-full px-3 py-2 text-left text-sm text-slate-800 hover:bg-slate-50"
-              onClick={() => {
-                void navigator.clipboard.writeText(projectUrl).catch(() => undefined);
-                setMenuOpen(false);
-              }}
+        {menuOpen &&
+          menuBox &&
+          typeof document !== 'undefined' &&
+          createPortal(
+            <div
+              ref={menuRef}
+              role="menu"
+              style={menuBox}
+              className="rounded-xl border border-slate-200 bg-white py-1 shadow-xl"
             >
-              Copy project link
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              className="block w-full px-3 py-2 text-left text-sm text-slate-800 hover:bg-slate-50"
-              onClick={() => {
-                window.open(projectUrl, '_blank', 'noopener,noreferrer');
-                setMenuOpen(false);
-              }}
-            >
-              Open project in new tab
-            </button>
-            <div className="my-1 h-px bg-slate-100" />
-            <Link
-              role="menuitem"
-              to={`/app/projects/${projectId}/team`}
-              className="block px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
-              onClick={() => setMenuOpen(false)}
-            >
-              Team
-            </Link>
-            <Link
-              role="menuitem"
-              to={reportsTo}
-              className="block px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
-              onClick={() => setMenuOpen(false)}
-            >
-              Reports
-            </Link>
-            <Link
-              role="menuitem"
-              to={`/app/projects/${projectId}/automations`}
-              className="block px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
-              onClick={() => setMenuOpen(false)}
-            >
-              Automations
-            </Link>
-            {isAdmin && (
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full px-3 py-2 text-left text-sm text-slate-800 hover:bg-slate-50"
+                onClick={() => {
+                  void navigator.clipboard.writeText(projectUrl).catch(() => undefined);
+                  setMenuOpen(false);
+                }}
+              >
+                Copy project link
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full px-3 py-2 text-left text-sm text-slate-800 hover:bg-slate-50"
+                onClick={() => {
+                  window.open(projectUrl, '_blank', 'noopener,noreferrer');
+                  setMenuOpen(false);
+                }}
+              >
+                Open project in new tab
+              </button>
+              <div className="my-1 h-px bg-slate-100" />
               <Link
                 role="menuitem"
-                to={`/app/projects/${projectId}/settings`}
+                to={`/app/projects/${projectId}/team`}
                 className="block px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
                 onClick={() => setMenuOpen(false)}
               >
-                Intake settings
+                Team
               </Link>
-            )}
-          </div>
-        )}
+              <Link
+                role="menuitem"
+                to={reportsTo}
+                className="block px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
+                onClick={() => setMenuOpen(false)}
+              >
+                Reports
+              </Link>
+              <Link
+                role="menuitem"
+                to={`/app/projects/${projectId}/automations`}
+                className="block px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
+                onClick={() => setMenuOpen(false)}
+              >
+                Automations
+              </Link>
+              {isAdmin && (
+                <Link
+                  role="menuitem"
+                  to={`/app/projects/${projectId}/settings`}
+                  className="block px-3 py-2 text-sm text-slate-800 hover:bg-slate-50"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Intake settings
+                </Link>
+              )}
+            </div>,
+            document.body
+          )}
       </div>
     </div>
   );

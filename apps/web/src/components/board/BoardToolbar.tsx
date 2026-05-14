@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import {
   PRIORITY_LEVELS,
   type SavedView,
@@ -13,6 +14,7 @@ import {
   type BoardCardFieldKey,
   type ListColumnKey,
 } from '../../hooks/useViewColumnPrefs';
+import { menuBelowTrigger } from '../project/floatingMenuGeometry';
 
 type Props = {
   canManageBoard: boolean;
@@ -73,14 +75,34 @@ export function BoardToolbar({
   onToggleBoardCard,
 }: Props) {
   const [viewsOpen, setViewsOpen] = useState(false);
-  const viewsRef = useRef<HTMLDivElement>(null);
+  const [viewsMenuBox, setViewsMenuBox] = useState<CSSProperties | null>(null);
+  const viewsBtnRef = useRef<HTMLButtonElement>(null);
+  const viewsMenuRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!viewsOpen) {
+      setViewsMenuBox(null);
+      return;
+    }
+    const sync = () => {
+      if (!viewsBtnRef.current) return;
+      setViewsMenuBox(menuBelowTrigger(viewsBtnRef.current, { minWidth: 288, maxWidth: 288 }));
+    };
+    sync();
+    window.addEventListener('resize', sync);
+    document.addEventListener('scroll', sync, true);
+    return () => {
+      window.removeEventListener('resize', sync);
+      document.removeEventListener('scroll', sync, true);
+    };
+  }, [viewsOpen]);
 
   useEffect(() => {
     if (!viewsOpen) return;
     function onClick(e: MouseEvent) {
-      if (viewsRef.current && !viewsRef.current.contains(e.target as Node)) {
-        setViewsOpen(false);
-      }
+      const t = e.target as Node;
+      if (viewsBtnRef.current?.contains(t) || viewsMenuRef.current?.contains(t)) return;
+      setViewsOpen(false);
     }
     document.addEventListener('mousedown', onClick);
     return () => document.removeEventListener('mousedown', onClick);
@@ -232,8 +254,9 @@ export function BoardToolbar({
           </button>
         )}
 
-        <div ref={viewsRef} className="relative">
+        <div className="relative">
           <button
+            ref={viewsBtnRef}
             type="button"
             onClick={() => setViewsOpen((v) => !v)}
             className="rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-white"
@@ -242,74 +265,80 @@ export function BoardToolbar({
           >
             Views {views.length > 0 && <span className="ml-1 text-slate-400">({views.length})</span>}
           </button>
-          {viewsOpen && (
-            <div
-              role="menu"
-              className="absolute right-0 z-20 mt-1 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-2xl"
-            >
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  onApplyView(null);
-                  setViewsOpen(false);
-                }}
-                className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-sm hover:bg-slate-100 ${
-                  activeView === null ? 'font-semibold text-slate-900' : 'text-slate-700'
-                }`}
+          {viewsOpen &&
+            viewsMenuBox &&
+            typeof document !== 'undefined' &&
+            createPortal(
+              <div
+                ref={viewsMenuRef}
+                role="menu"
+                style={viewsMenuBox}
+                className="rounded-xl border border-slate-200 bg-white p-2 shadow-2xl"
               >
-                Default view
-                {activeView === null && <span className="text-xs text-slate-400">active</span>}
-              </button>
-              {views.length > 0 && <div className="my-1 border-t border-slate-100" />}
-              <ul className="max-h-64 overflow-y-auto">
-                {views.map((v) => (
-                  <li key={v.id} className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        onApplyView(v);
-                        setViewsOpen(false);
-                      }}
-                      className={`flex-1 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-slate-100 ${
-                        v.id === activeViewId ? 'font-semibold text-slate-900' : 'text-slate-700'
-                      }`}
-                      title={`Search: "${v.filters.search}" · Priorities: ${
-                        v.filters.priorities.length ? v.filters.priorities.join(',') : 'any'
-                      }${v.listColumns || v.boardCardFields ? ' · includes column layout' : ''}`}
-                    >
-                      {v.name}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onDeleteView(v.id)}
-                      className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                      aria-label={`Delete view ${v.name}`}
-                    >
-                      ✕
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-1 border-t border-slate-100 pt-1">
                 <button
                   type="button"
                   role="menuitem"
-                  onClick={handleSaveView}
-                  disabled={!canSaveView}
-                  className="w-full rounded-lg bg-slate-900 px-2 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
-                  title={
-                    canSaveView
-                      ? 'Saves filters and current column/card visibility for this board'
-                      : 'Set a filter, search, or change column visibility first'
-                  }
+                  onClick={() => {
+                    onApplyView(null);
+                    setViewsOpen(false);
+                  }}
+                  className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-sm hover:bg-slate-100 ${
+                    activeView === null ? 'font-semibold text-slate-900' : 'text-slate-700'
+                  }`}
                 >
-                  Save current as view…
+                  Default view
+                  {activeView === null && <span className="text-xs text-slate-400">active</span>}
                 </button>
-              </div>
-            </div>
-          )}
+                {views.length > 0 && <div className="my-1 border-t border-slate-100" />}
+                <ul className="max-h-64 overflow-y-auto">
+                  {views.map((v) => (
+                    <li key={v.id} className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          onApplyView(v);
+                          setViewsOpen(false);
+                        }}
+                        className={`flex-1 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-slate-100 ${
+                          v.id === activeViewId ? 'font-semibold text-slate-900' : 'text-slate-700'
+                        }`}
+                        title={`Search: "${v.filters.search}" · Priorities: ${
+                          v.filters.priorities.length ? v.filters.priorities.join(',') : 'any'
+                        }${v.listColumns || v.boardCardFields ? ' · includes column layout' : ''}`}
+                      >
+                        {v.name}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteView(v.id)}
+                        className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                        aria-label={`Delete view ${v.name}`}
+                      >
+                        ✕
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-1 border-t border-slate-100 pt-1">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={handleSaveView}
+                    disabled={!canSaveView}
+                    className="w-full rounded-lg bg-slate-900 px-2 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
+                    title={
+                      canSaveView
+                        ? 'Saves filters and current column/card visibility for this board'
+                        : 'Set a filter, search, or change column visibility first'
+                    }
+                  >
+                    Save current as view…
+                  </button>
+                </div>
+              </div>,
+              document.body
+            )}
         </div>
 
         {hasFilters && (
