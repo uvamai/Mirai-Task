@@ -15,6 +15,7 @@ export class PlanLimitError extends Error {
     super(message);
     this.name = 'PlanLimitError';
     this.code = code;
+    Object.setPrototypeOf(this, PlanLimitError.prototype);
   }
 }
 

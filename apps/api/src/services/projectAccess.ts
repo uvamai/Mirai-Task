@@ -8,6 +8,7 @@ export class ProjectAccessError extends Error {
   constructor(message = 'No access to this project') {
     super(message);
     this.name = 'ProjectAccessError';
+    Object.setPrototypeOf(this, ProjectAccessError.prototype);
   }
 }
 

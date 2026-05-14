@@ -20,8 +20,20 @@ import { assertInviteRoleWithinPolicy, assertMembershipMayInviteTenant, resolveO
 const BCRYPT_ROUNDS = 12;
 const INVITE_TTL_MS = 7 * 86400_000;
 
-export class InviteEmailMismatchError extends Error {}
-export class InviteSignInRequiredError extends Error {}
+export class InviteEmailMismatchError extends Error {
+  constructor(message?: string) {
+    super(message);
+    this.name = 'InviteEmailMismatchError';
+    Object.setPrototypeOf(this, InviteEmailMismatchError.prototype);
+  }
+}
+export class InviteSignInRequiredError extends Error {
+  constructor(message?: string) {
+    super(message);
+    this.name = 'InviteSignInRequiredError';
+    Object.setPrototypeOf(this, InviteSignInRequiredError.prototype);
+  }
+}
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
