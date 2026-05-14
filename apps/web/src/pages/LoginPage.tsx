@@ -17,6 +17,8 @@ export function LoginPage() {
   const [params] = useSearchParams();
   const nextPathRaw = params.get('next');
   const nextPath = nextPathRaw && nextPathRaw.startsWith('/') ? nextPathRaw : null;
+  /** Pick workspace when the account has multiple tenants (must match a membership). */
+  const tenantIdFromUrl = params.get('tenantId') ?? params.get('tenant');
 
   return (
     <div className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6 py-16">
@@ -30,7 +32,10 @@ export function LoginPage() {
             const res = await fetch('/api/auth/login', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(values),
+              body: JSON.stringify({
+                ...values,
+                ...(tenantIdFromUrl ? { tenantId: tenantIdFromUrl } : {}),
+              }),
             });
             const body = await res.json().catch(() => ({}));
             if (!res.ok) {

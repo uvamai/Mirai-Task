@@ -52,7 +52,9 @@ import { assertValidParentTask } from '../services/taskParentage';
 import { extractMentionsFromBody } from '../services/commentMentions';
 import { createUserNotification } from '../services/notificationService';
 import { resolveMentionHandlesToUserIds } from '../services/mentionUsers';
-import { mentionsEnabled } from '../services/notificationPrefs';
+import { mentionsEnabled, quietHoursBlock } from '../services/notificationPrefs';
+import Joi from 'joi';
+import { TaskRelation } from '../models';
 
 export const tasksRouter = Router();
 
@@ -105,6 +107,7 @@ tasksRouter.get('/tasks/my-work', authenticateJwt, loadMembership, async (req, r
         status: t.status,
         priority: t.priority,
         dueDate: t.dueDate,
+        tags: t.tags,
         projectId: t.projectId,
         boardId: t.boardId,
         projectName: p?.name ?? '',
@@ -359,6 +362,170 @@ tasksRouter.get('/tasks/:taskId', authenticateJwt, loadMembership, async (req, r
       after: l.afterJson,
       createdAt: l.createdAt,
     })),
+  });
+});
+
+function normalizePair(a: string, b: string): [string, string] {
+  return a < b ? [a, b] : [b, a];
+}
+
+const relatedCreateSchema = Joi.object({
+  toTaskId: Joi.string().uuid().required(),
+});
+
+tasksRouter.get('/tasks/:taskId/related', authenticateJwt, loadMembership, async (req, res) => {
+  const task = await Task.findOne({ where: { id: req.params.taskId, tenantId: req.tenantId! } });
+  if (!task) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+  try {
+    await assertProjectMemberAccess(req.tenantId!, req.userId!, req.membership?.role, task.projectId);
+  } catch (e) {
+    if (e instanceof ProjectAccessError) {
+      res.status(403).json({ error: e.message, code: e.code });
+      return;
+    }
+    throw e;
+  }
+  const rels = await TaskRelation.findAll({
+    where: { tenantId: req.tenantId!, projectId: task.projectId, type: 'related', fromTaskId: task.id },
+    order: [['createdAt', 'DESC']],
+  });
+  const ids = rels.map((r) => r.toTaskId);
+  const rows = ids.length
+    ? await Task.findAll({
+        where: { tenantId: req.tenantId!, projectId: task.projectId, id: { [Op.in]: ids } },
+        attributes: ['id', 'key', 'title', 'status', 'boardId', 'projectId'],
+      })
+    : [];
+  res.json({ related: rows.map((t) => ({ id: t.id, key: t.key, title: t.title, status: t.status, boardId: t.boardId, projectId: t.projectId })) });
+});
+
+tasksRouter.post('/tasks/:taskId/related', authenticateJwt, loadMembership, requireRole('ADMIN', 'MANAGER', 'EMPLOYEE'), async (req, res) => {
+  const { error, value } = relatedCreateSchema.validate(req.body, { abortEarly: false });
+  if (error) {
+    res.status(400).json({ error: 'Validation failed', details: error.details });
+    return;
+  }
+  const task = await Task.findOne({ where: { id: req.params.taskId, tenantId: req.tenantId! } });
+  if (!task) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+  const other = await Task.findOne({ where: { id: value.toTaskId, tenantId: req.tenantId! } });
+  if (!other) {
+    res.status(404).json({ error: 'Target task not found' });
+    return;
+  }
+  if (task.projectId !== other.projectId) {
+    res.status(400).json({ error: 'Related task must be in the same project' });
+    return;
+  }
+  try {
+    await assertProjectMemberAccess(req.tenantId!, req.userId!, req.membership?.role, task.projectId);
+  } catch (e) {
+    if (e instanceof ProjectAccessError) {
+      res.status(403).json({ error: e.message, code: e.code });
+      return;
+    }
+    throw e;
+  }
+  if (req.membership?.role === 'EMPLOYEE' && task.assigneeId !== req.userId) {
+    res.status(403).json({ error: 'Can only edit assigned tasks' });
+    return;
+  }
+  if (task.id === other.id) {
+    res.status(400).json({ error: 'Task cannot relate to itself' });
+    return;
+  }
+  const [fromTaskId, toTaskId] = normalizePair(task.id, other.id);
+  const created = await TaskRelation.findOrCreate({
+    where: { tenantId: req.tenantId!, projectId: task.projectId, type: 'related', fromTaskId, toTaskId },
+    defaults: { tenantId: req.tenantId!, projectId: task.projectId, type: 'related', fromTaskId, toTaskId },
+  });
+  res.status(201).json({ ok: true, created: created[1] });
+});
+
+tasksRouter.delete('/tasks/:taskId/related/:toTaskId', authenticateJwt, loadMembership, requireRole('ADMIN', 'MANAGER', 'EMPLOYEE'), async (req, res) => {
+  const delSchema = Joi.object({ toTaskId: Joi.string().uuid().required() });
+  const { error } = delSchema.validate(req.params, { abortEarly: false });
+  if (error) {
+    res.status(400).json({ error: 'Validation failed', details: error.details });
+    return;
+  }
+  const task = await Task.findOne({ where: { id: req.params.taskId, tenantId: req.tenantId! } });
+  if (!task) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+  const other = await Task.findOne({ where: { id: req.params.toTaskId, tenantId: req.tenantId! } });
+  if (!other) {
+    res.status(404).json({ error: 'Target task not found' });
+    return;
+  }
+  if (task.projectId !== other.projectId) {
+    res.status(400).json({ error: 'Related task must be in the same project' });
+    return;
+  }
+  try {
+    await assertProjectMemberAccess(req.tenantId!, req.userId!, req.membership?.role, task.projectId);
+  } catch (e) {
+    if (e instanceof ProjectAccessError) {
+      res.status(403).json({ error: e.message, code: e.code });
+      return;
+    }
+    throw e;
+  }
+  if (req.membership?.role === 'EMPLOYEE' && task.assigneeId !== req.userId) {
+    res.status(403).json({ error: 'Can only edit assigned tasks' });
+    return;
+  }
+  const [fromTaskId, toTaskId] = normalizePair(task.id, other.id);
+  await TaskRelation.destroy({ where: { tenantId: req.tenantId!, projectId: task.projectId, type: 'related', fromTaskId, toTaskId } });
+  res.json({ ok: true });
+});
+
+tasksRouter.get('/tasks/:taskId/related-set', authenticateJwt, loadMembership, async (req, res) => {
+  const task = await Task.findOne({ where: { id: req.params.taskId, tenantId: req.tenantId! } });
+  if (!task) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+  try {
+    await assertProjectMemberAccess(req.tenantId!, req.userId!, req.membership?.role, task.projectId);
+  } catch (e) {
+    if (e instanceof ProjectAccessError) {
+      res.status(403).json({ error: e.message, code: e.code });
+      return;
+    }
+    throw e;
+  }
+
+  const [parentRow, children, siblings, rels] = await Promise.all([
+    task.parentTaskId
+      ? Task.findOne({ where: { id: task.parentTaskId, tenantId: req.tenantId!, projectId: task.projectId }, attributes: ['id', 'key', 'title', 'status', 'boardId', 'projectId'] })
+      : Promise.resolve(null),
+    Task.findAll({ where: { tenantId: req.tenantId!, projectId: task.projectId, parentTaskId: task.id }, attributes: ['id', 'key', 'title', 'status', 'boardId', 'projectId'], order: [['position', 'ASC']] }),
+    task.parentTaskId
+      ? Task.findAll({ where: { tenantId: req.tenantId!, projectId: task.projectId, parentTaskId: task.parentTaskId, id: { [Op.ne]: task.id } }, attributes: ['id', 'key', 'title', 'status', 'boardId', 'projectId'], order: [['position', 'ASC']] })
+      : Promise.resolve([]),
+    TaskRelation.findAll({ where: { tenantId: req.tenantId!, projectId: task.projectId, type: 'related', [Op.or]: [{ fromTaskId: task.id }, { toTaskId: task.id }] }, order: [['createdAt', 'DESC']] }),
+  ]);
+
+  const relatedIds = Array.from(new Set(rels.map((r) => (r.fromTaskId === task.id ? r.toTaskId : r.fromTaskId))));
+  const relatedRows = relatedIds.length
+    ? await Task.findAll({
+        where: { tenantId: req.tenantId!, projectId: task.projectId, id: { [Op.in]: relatedIds } },
+        attributes: ['id', 'key', 'title', 'status', 'boardId', 'projectId'],
+      })
+    : [];
+
+  res.json({
+    parent: parentRow ? { id: parentRow.id, key: parentRow.key, title: parentRow.title, status: parentRow.status, boardId: parentRow.boardId, projectId: parentRow.projectId } : null,
+    children: children.map((t) => ({ id: t.id, key: t.key, title: t.title, status: t.status, boardId: t.boardId, projectId: t.projectId })),
+    siblings: (siblings ?? []).map((t) => ({ id: t.id, key: t.key, title: t.title, status: t.status, boardId: t.boardId, projectId: t.projectId })),
+    relatedLinks: relatedRows.map((t) => ({ id: t.id, key: t.key, title: t.title, status: t.status, boardId: t.boardId, projectId: t.projectId })),
   });
 });
 
@@ -855,7 +1022,9 @@ tasksRouter.post('/tasks/:taskId/comments', authenticateJwt, loadMembership, asy
   for (const [handle, uid] of map) {
     if (uid === req.userId) continue;
     const tm = await TenantMembership.findOne({ where: { tenantId: req.tenantId!, userId: uid } });
-    if (!mentionsEnabled(tm?.preferences as Record<string, unknown> | undefined)) continue;
+    const prefs = tm?.preferences as Record<string, unknown> | undefined;
+    if (!mentionsEnabled(prefs)) continue;
+    if (quietHoursBlock(prefs, new Date())) continue;
     await createUserNotification({
       tenantId: req.tenantId!,
       userId: uid,

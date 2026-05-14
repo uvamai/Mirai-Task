@@ -37,7 +37,7 @@ See **[docs/jira-parity-roadmap.md](docs/jira-parity-roadmap.md)** for deeper ba
    npm run migrate
    ```
 
-   Postgres is mapped to host port **55432** by default (see `docker-compose.yml`).
+   Postgres is mapped to host port **15432** by default (see `docker-compose.yml`; avoids Windows Hyper-V excluded ranges that blocked **55432**).
 
 3. Start API (terminal 1):
 

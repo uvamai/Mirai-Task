@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiJson } from '../api/client';
 import type { TaskRow, CustomFieldDef } from '../features/tasks/types';
+import { TagPill } from '../components/TagPill';
 
 type TasksPayload = {
   tasks: TaskRow[];
@@ -115,6 +116,13 @@ export function TaskCalendarPage() {
                     <li key={t.id} className="rounded-lg bg-indigo-50/80 px-1.5 py-1 text-slate-800 ring-1 ring-indigo-100">
                       <span className="font-semibold text-indigo-800">{t.key}</span>
                       <div className="truncate text-slate-700">{t.title}</div>
+                      {(t.tags ?? []).length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {(t.tags ?? []).slice(0, 1).map((tag) => (
+                            <TagPill key={tag} tag={tag} />
+                          ))}
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>

@@ -16,7 +16,7 @@ function requireEnv(name: string, fallback?: string): string {
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: Number(process.env.PORT ?? 4000),
-  databaseUrl: requireEnv('DATABASE_URL', 'postgres://mirai:mirai@localhost:55432/mirai_tasker'),
+  databaseUrl: requireEnv('DATABASE_URL', 'postgres://mirai:mirai@127.0.0.1:15432/mirai_tasker'),
   jwtAccessSecret: requireEnv('JWT_ACCESS_SECRET', 'dev-access-secret-min-32-characters-long'),
   jwtRefreshSecret: requireEnv('JWT_REFRESH_SECRET', 'dev-refresh-secret-min-32-characters-long'),
   accessTtlMin: Number(process.env.ACCESS_TOKEN_TTL_MIN ?? 15),

@@ -1,9 +1,9 @@
 export function apiHeaders(): HeadersInit {
   const h: Record<string, string> = {};
   const token = localStorage.getItem('mirai_access_token');
-  const tenantId = localStorage.getItem('mirai_tenant_id');
   if (token) h.Authorization = `Bearer ${token}`;
-  if (tenantId) h['X-Tenant-Id'] = tenantId;
+  /** Do not send `X-Tenant-Id` here. With `ALLOW_X_TENANT_ID`, the API would override the JWT `tid`
+   *  with a stale `mirai_tenant_id` from localStorage (e.g. after using another workspace), hiding projects/boards. */
   return h;
 }
 

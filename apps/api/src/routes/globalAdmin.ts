@@ -47,7 +47,7 @@ globalAdminRouter.get('/global-admin/users', async (req, res) => {
   const { value, offset } = pag;
   const query = typeof req.query.query === 'string' ? req.query.query.trim() : '';
   const loginState = typeof req.query.isLoginActive === 'string' ? req.query.isLoginActive : '';
-  const where: any = {};
+  const where: Record<string | symbol, unknown> = {};
   if (query) {
     where[Op.or] = [
       { email: { [Op.iLike]: `%${query}%` } },

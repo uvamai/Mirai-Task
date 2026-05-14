@@ -40,14 +40,21 @@ const orgPoliciesSchema = Joi.object({
   defaultSlaDaysByPriority: slaDaysByPrioritySchema.optional(),
 }).optional();
 
+const tagCatalogItemSchema = Joi.object({
+  name: Joi.string().trim().min(1).max(32).required(),
+  /** Visual tone used by the web app (`Badge` tones). */
+  tone: Joi.string().valid('default', 'indigo', 'amber', 'rose', 'emerald').default('default'),
+});
+
 const patchSchema = Joi.object({
   estimateMode: Joi.string().valid('story_points', 'hours').optional(),
   orgPolicies: orgPoliciesSchema,
   legalHold: Joi.boolean().optional(),
   customBoardTemplates: Joi.array().items(customBoardTemplateItemSchema).max(20).optional(),
+  tagCatalog: Joi.array().items(tagCatalogItemSchema).max(50).optional(),
 }).min(1);
 
-tenantSettingsRouter.get('/tenant/settings', authenticateJwt, loadMembership, requireRole('ADMIN'), async (req, res) => {
+tenantSettingsRouter.get('/tenant/settings', authenticateJwt, loadMembership, async (req, res) => {
   const tenant = await Tenant.findByPk(req.tenantId!);
   if (!tenant) {
     res.status(404).json({ error: 'Not found' });
@@ -99,6 +106,24 @@ tenantSettingsRouter.patch(
         next.defaultSlaDaysByPriority = { ...prev, ...d };
       }
       tenant.settings = { ...tenant.settings, orgPolicies: next };
+    }
+    if (value.tagCatalog !== undefined) {
+      const raw = value.tagCatalog as { name: string; tone?: string }[];
+      const normalized = raw
+        .map((t) => ({
+          name: String(t.name ?? '').trim(),
+          tone: String(t.tone ?? 'default'),
+        }))
+        .filter((t) => t.name.length > 0)
+        .slice(0, 50);
+      const seen = new Set<string>();
+      const deduped = normalized.filter((t) => {
+        const k = t.name.toLowerCase();
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+      tenant.settings = { ...tenant.settings, tagCatalog: deduped };
     }
     await tenant.save();
     res.json({ settings: tenant.settings });

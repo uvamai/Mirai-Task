@@ -25,7 +25,7 @@ export async function runRecurringTaskTick(): Promise<number> {
         assigneeUserId: r.assigneeUserId,
       });
       r.lastGeneratedAt = now;
-      let next = advanceNextRun(r.nextRunAt, r.frequency, r.intervalCount);
+      const next = advanceNextRun(r.nextRunAt, r.frequency, r.intervalCount);
       if (r.endDate) {
         const end = new Date(`${r.endDate}T23:59:59.999Z`);
         if (next.getTime() > end.getTime()) {

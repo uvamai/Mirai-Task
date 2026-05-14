@@ -8,8 +8,8 @@ Positioning target: mid-market growth (strong team value in Standard, operationa
 
 - Free: trial and small-team starter value.
 - Standard: team collaboration baseline for SMBs.
-- Pro: operational scale, automation, and process rigor.
-- Enterprise: governance, compliance posture, and large-scale controls.
+- Pro: operational scale, **schedule-based recurring tasks**, SLA, and process rigor (not the AI automation board).
+- Enterprise: governance, compliance posture, large-scale controls, and **AI/automation board** on subscription.
 
 ## Feature matrix
 
@@ -27,7 +27,7 @@ Positioning target: mid-market growth (strong team value in Standard, operationa
 | Collaboration | Task comments | No | Yes | Yes | Yes | Current |
 | Collaboration | @mention notifications | No | Yes | Yes | Yes | Current |
 | Notifications | In-app bell + unread count | No | Yes | Yes | Yes | Current |
-| Notifications | Notification preferences + quiet hours (UTC) | No | Yes | Yes | Yes | Current |
+| Notifications | Notification preferences + quiet hours (user IANA timezone) | No | Yes | Yes | Yes | Current; `preferences.notifications.quietHoursTimezone` |
 | Templates | Built-in board templates | Limited | Yes | Yes | Yes | Current; Free includes starter subset |
 | Templates | Org custom templates (JSON) | No | No | Yes | Yes | Current |
 | Templates | Save board as org template | No | No | Yes | Yes | Current |
@@ -35,13 +35,19 @@ Positioning target: mid-market growth (strong team value in Standard, operationa
 | SLA and ops | Reminder engine (due/overdue/tomorrow + SLA events) | No | No | Yes | Yes | Current |
 | SLA and ops | Recurring tasks (per board) | No | No | Yes | Yes | Current |
 | SLA and ops | My Work (cross-board queue + sorting) | No | No | Yes | Yes | Current |
+| AI and automation | Dedicated automation board + agent mirror tasks | No | No | No | Yes | **Enterprise + active subscription**; roadmap A5–A8, M1–M5 |
+| AI and automation | Assign-to-agent → automation board + review queue | No | No | No | Yes | Roadmap A6, A13; gated M4–M5 |
+| AI and automation | Approve & Execute (sole execution gate) | No | No | No | Yes | Roadmap A9 |
+| AI and automation | `automation_jobs` worker + runner integration | No | No | No | Yes | Roadmap A1–A4, A12 |
 | Audit and reporting | Task activity timeline | No | No | Yes | Yes | Current |
 | Integrations | Project webhooks (existing outbound task events) | No | No | Yes | Yes | Current |
 | Integrations | Notification delivery via email/webhook channels | No | No | Planned | Planned | Roadmap P1 |
-| Performance and UX | Full Kanban virtualization with DnD | No | No | Planned | Planned | Roadmap P1 (currently partial) |
-| Accessibility and quality | Full modal focus trap coverage | No | Planned | Planned | Planned | Roadmap P2 quality baseline |
+| Integrations | Transactional email for invitations (SMTP/provider) | No | No | Planned | Planned | Roadmap P13 |
+| Performance and UX | Full Kanban virtualization with DnD | No | No | Planned | Planned | Roadmap T16b (see ROADMAP-TODO-SPECS) |
+| Accessibility and quality | Full modal focus trap coverage | No | Planned | Planned | Planned | Roadmap P8 |
+| Identity | SAML SP-initiated enterprise SSO | No | No | Optional | Yes | Roadmap P14 (scaffold: `/auth/sso/status`) |
 | Governance and security | Compliance bundle and legal-hold workflows | No | No | Optional | Yes | Current enterprise/ITSM posture |
-| Governance and security | Advanced abuse/rate controls | No | No | Planned | Planned+ | Roadmap P3, stronger at Enterprise |
+| Governance and security | Advanced abuse/rate controls | No | No | Planned | Planned+ | Roadmap P12, stronger at Enterprise |
 
 ## Limits and support SLA
 
@@ -58,11 +64,12 @@ Positioning target: mid-market growth (strong team value in Standard, operationa
   - Free: basic tasking and board usage with strict limits.
   - Standard: collaboration layer (invites, comments, mentions, notifications, custom columns).
   - Pro: operations layer (recurring, reminders, SLA policy, My Work, org templates, webhooks).
-  - Enterprise: governance/compliance depth and contractual scale.
+  - Enterprise: governance/compliance depth, contractual scale, and AI/automation board (active subscription).
 - Planned upgrades:
-  - P1: full Kanban virtualization + DnD, richer notification delivery channels.
-  - P2: deeper E2E reliability and broader accessibility hardening.
-  - P3: improved mention resolution, timezone-aware quiet hours, stronger abuse/rate controls.
+  - T16b / P2: full Kanban virtualization + DnD; deeper E2E reliability.
+  - P1 / P13: richer notification delivery + invitation email.
+  - P8 / P10 / P11 / P12: accessibility, mention display, timezone quiet hours, rate limits.
+  - P14: enterprise SAML SSO beyond readiness probe.
 
 ## Packaging guidance
 

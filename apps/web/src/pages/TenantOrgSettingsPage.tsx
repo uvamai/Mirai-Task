@@ -12,6 +12,9 @@ type OrgPolicies = {
   defaultSlaDaysByPriority?: Record<string, number>;
 };
 
+type TagTone = 'default' | 'indigo' | 'amber' | 'rose' | 'emerald';
+type TagCatalogItem = { name: string; tone: TagTone };
+
 function clampSlaDay(n: number): number {
   if (!Number.isFinite(n)) return 1;
   return Math.min(90, Math.max(1, Math.round(n)));
@@ -37,6 +40,7 @@ export function TenantOrgSettingsPage() {
   const [defaultSlaStartPolicy, setDefaultSlaStartPolicy] = useState('');
   const [legalHold, setLegalHold] = useState(false);
   const [customTemplatesJson, setCustomTemplatesJson] = useState('[]');
+  const [tagCatalogJson, setTagCatalogJson] = useState('[]');
   const [orgD0, setOrgD0] = useState(1);
   const [orgD1, setOrgD1] = useState(2);
   const [orgD2, setOrgD2] = useState(3);
@@ -71,6 +75,11 @@ export function TenantOrgSettingsPage() {
     } catch {
       setCustomTemplatesJson('[]');
     }
+    try {
+      setTagCatalogJson(JSON.stringify(s.tagCatalog ?? [], null, 2));
+    } catch {
+      setTagCatalogJson('[]');
+    }
   }, [settingsQ.data]);
 
   const save = useMutation({
@@ -84,12 +93,31 @@ export function TenantOrgSettingsPage() {
       if (!Array.isArray(customBoardTemplates)) {
         throw new Error('Custom board templates must be a JSON array');
       }
+      let tagCatalog: unknown;
+      try {
+        tagCatalog = JSON.parse(tagCatalogJson) as unknown;
+      } catch {
+        throw new Error('Tag catalog must be valid JSON');
+      }
+      if (!Array.isArray(tagCatalog)) {
+        throw new Error('Tag catalog must be a JSON array');
+      }
+      const tones = new Set(['default', 'indigo', 'amber', 'rose', 'emerald']);
+      const normalizedTags: TagCatalogItem[] = (tagCatalog as unknown[])
+        .map((x) => (x && typeof x === 'object' ? (x as Record<string, unknown>) : {}))
+        .map((o) => ({
+          name: typeof o.name === 'string' ? o.name.trim().slice(0, 32) : '',
+          tone: tones.has(String(o.tone)) ? (String(o.tone) as TagTone) : 'default',
+        }))
+        .filter((t) => t.name.length > 0)
+        .slice(0, 50);
       const res = await apiFetch('/tenant/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           legalHold,
           customBoardTemplates,
+          tagCatalog: normalizedTags,
           orgPolicies: {
             projectCreationPolicy,
             whoCanInvite,
@@ -220,6 +248,23 @@ export function TenantOrgSettingsPage() {
                 value={customTemplatesJson}
                 onChange={(e) => setCustomTemplatesJson(e.target.value)}
                 rows={8}
+                className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs"
+                spellCheck={false}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600">Tag catalog (JSON array)</label>
+              <p className="mt-1 text-[11px] text-slate-500">
+                Defines suggested tags and their color tone across the app. Each item:
+                <code className="ml-1 rounded bg-white/80 px-1 py-0.5 font-mono text-[10px]">
+                  {"{\"name\":\"UI/UX improvement\",\"tone\":\"indigo\"}"}
+                </code>
+                .
+              </p>
+              <textarea
+                value={tagCatalogJson}
+                onChange={(e) => setTagCatalogJson(e.target.value)}
+                rows={6}
                 className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 font-mono text-xs"
                 spellCheck={false}
               />

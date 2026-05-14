@@ -30,6 +30,8 @@ const intakeLimiter = rateLimit({
 type PublicIntakeCfg = {
   enabled?: boolean;
   requestTypes?: { key: string; label: string; defaultPriority?: TaskPriority }[];
+  /** When set, new intake tasks are created on this board; otherwise the first board by position is used. */
+  targetBoardId?: string | null;
 };
 
 function readPublicIntake(settings: Record<string, unknown> | undefined): PublicIntakeCfg {
@@ -56,6 +58,15 @@ intakePublicRouter.get('/public/intake/:tenantSlug/:projectId/config', async (re
     res.status(404).json({ error: 'Public intake is not available for this project' });
     return;
   }
+  let intakeBoardName: string | null = null;
+  if (pi.targetBoardId) {
+    const tb = await Board.findOne({
+      where: { id: pi.targetBoardId, tenantId: tenant.id, projectId: project.id },
+      attributes: ['name'],
+    });
+    intakeBoardName = tb?.name ?? null;
+  }
+
   res.json({
     tenantName: tenant.name,
     projectName: project.name,
@@ -64,6 +75,7 @@ intakePublicRouter.get('/public/intake/:tenantSlug/:projectId/config', async (re
       label: r.label,
       defaultPriority: r.defaultPriority ?? 'P3',
     })),
+    intakeBoardName,
     captchaRequired: Boolean(
       process.env.TURNSTILE_SECRET_KEY || process.env.HCAPTCHA_SECRET_KEY || process.env.RECAPTCHA_SECRET_KEY
     ),
@@ -113,13 +125,21 @@ intakePublicRouter.post('/public/intake/:tenantSlug/:projectId', intakeLimiter, 
     return;
   }
 
-  const board = await Board.findOne({
-    where: { tenantId: tenant.id, projectId: project.id },
-    order: [
-      ['position', 'ASC'],
-      ['createdAt', 'ASC'],
-    ],
-  });
+  let board: Board | null = null;
+  if (pi.targetBoardId) {
+    board = await Board.findOne({
+      where: { id: pi.targetBoardId, tenantId: tenant.id, projectId: project.id },
+    });
+  }
+  if (!board) {
+    board = await Board.findOne({
+      where: { tenantId: tenant.id, projectId: project.id },
+      order: [
+        ['position', 'ASC'],
+        ['createdAt', 'ASC'],
+      ],
+    });
+  }
   if (!board) {
     res.status(500).json({ error: 'No board configured' });
     return;

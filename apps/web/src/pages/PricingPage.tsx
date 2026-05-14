@@ -18,7 +18,8 @@ export function PricingPage() {
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-600/90">Pricing</p>
           <h1 className="mt-2 text-3xl font-bold text-slate-900 md:text-4xl">Subscription plans</h1>
           <p className="mt-2 max-w-2xl text-slate-600">
-            Compare features and pricing for Starter, Standard, Pro, and Enterprise.
+            Compare features and pricing for Starter, Standard, Pro, and Enterprise. AI/automation board features
+            require Enterprise with an active subscription.
           </p>
         </div>
         <Link

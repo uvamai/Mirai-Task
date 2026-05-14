@@ -20,6 +20,8 @@ import { TaskDetailPanel } from '../features/tasks/TaskDetailPanel';
 import type { CustomFieldDef, TaskRow } from '../features/tasks/types';
 import { Badge } from '../components/ui/Badge';
 import { SlaCountdown } from '../features/tasks/SlaCountdown';
+import { TagPill } from '../components/TagPill';
+import { BoardToolbar } from '../components/board/BoardToolbar';
 
 function assigneeInitials(task: TaskRow): string {
   if (task.assigneeType === 'user' && task.assigneeId) return task.assigneeId.replace(/-/g, '').slice(-2).toUpperCase();
@@ -57,7 +59,7 @@ function SortableTaskCard({
       ref={setNodeRef}
       style={style}
       {...attributes}
-      className={`flex gap-1 rounded-xl border bg-white/95 px-2 shadow-md ring-1 transition ${
+      className={`glass-card flex gap-1 rounded-xl px-2 ring-1 transition ${
         dense ? 'py-1.5' : 'py-2'
       } ${overdue ? 'border-rose-300 ring-rose-200/80' : 'border-white/60 ring-slate-200/40'}`}
     >
@@ -78,11 +80,15 @@ function SortableTaskCard({
               {task.estimate} {estimateUnit}
             </Badge>
           )}
+          {(task.tags ?? []).slice(0, 2).map((t) => (
+            <TagPill key={t} tag={t} />
+          ))}
+          {(task.tags?.length ?? 0) > 2 && <Badge tone="default">+{task.tags!.length - 2}</Badge>}
         </div>
         <div className={`font-medium text-slate-900 ${dense ? 'text-xs' : 'text-sm'}`}>{task.title}</div>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <span
-            className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-700"
+            className="flex h-6 w-6 items-center justify-center rounded-full bg-white/60 text-[10px] font-bold text-slate-700 ring-1 ring-slate-200/40"
             title={task.assigneeId ?? ''}
           >
             {assigneeInitials(task)}
@@ -221,11 +227,21 @@ function BoardRecurringPanel({
   if (!canManage) return null;
 
   return (
-    <section className="rounded-2xl border border-white/50 bg-white/45 p-4 shadow-sm backdrop-blur-md">
-      <h2 className="text-sm font-bold text-slate-800">Recurring tasks</h2>
-      <p className="mt-1 text-xs text-slate-600">
-        Worker creates a task on each scheduled run (same board). Use for invoices, month-end, or repeating operational work.
-      </p>
+    <details className="rounded-2xl border border-white/50 bg-white/45 shadow-sm backdrop-blur-md">
+      <summary className="cursor-pointer select-none list-none px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-bold text-slate-800">Recurring tasks</h2>
+            <p className="mt-0.5 text-xs text-slate-600">
+              Schedule repeating operational work. (Creates a task on each run.)
+            </p>
+          </div>
+          <span className="rounded-lg bg-white/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600 ring-1 ring-slate-200">
+            Configure
+          </span>
+        </div>
+      </summary>
+      <div className="border-t border-white/60 px-4 pb-4">
       <div className="mt-3 flex flex-wrap items-end gap-2">
         <label className="flex min-w-[140px] flex-1 flex-col text-[10px] font-semibold uppercase text-slate-500">
           Title
@@ -326,7 +342,8 @@ function BoardRecurringPanel({
           </li>
         ))}
       </ul>
-    </section>
+      </div>
+    </details>
   );
 }
 
@@ -657,67 +674,27 @@ export function BoardPage() {
 
   if (!projectId || !boardId) return <p className="text-slate-600">Missing board</p>;
 
+  const inspectorOpen = Boolean(selectedTaskId);
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/40 bg-white/40 px-4 py-3 shadow-sm backdrop-blur-md">
-        <div>
-          <p className="text-xs text-slate-500">Board toolbar</p>
-          <p className="text-sm text-slate-700">Drag cards between columns. Drag the narrow strip at a column edge to resize.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
-              density === 'comfortable' ? 'bg-slate-900 text-white' : 'bg-white/80 text-slate-700 ring-1 ring-slate-200'
-            }`}
-            onClick={() => {
-              setDensity('comfortable');
-              localStorage.setItem('mirai_board_density', 'comfortable');
-            }}
-          >
-            Comfortable
-          </button>
-          <button
-            type="button"
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
-              density === 'dense' ? 'bg-slate-900 text-white' : 'bg-white/80 text-slate-700 ring-1 ring-slate-200'
-            }`}
-            onClick={() => {
-              setDensity('dense');
-              localStorage.setItem('mirai_board_density', 'dense');
-            }}
-          >
-            Dense
-          </button>
-          {canManageBoard && (
-            <button
-              type="button"
-              onClick={openColumnEditor}
-              className="rounded-lg bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-800 ring-1 ring-slate-200 hover:bg-white"
-            >
-              Edit columns
-            </button>
-          )}
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={openSaveTemplate}
-              className="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-900 ring-1 ring-indigo-200 hover:bg-indigo-100"
-            >
-              Save as org template
-            </button>
-          )}
-          {canCreate && (
-            <button
-              type="button"
-              onClick={() => setCreateOpen(true)}
-              className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-md"
-            >
-              New task
-            </button>
-          )}
-        </div>
-      </div>
+    <div
+      className={`flex min-h-[calc(100vh-220px)] flex-col gap-3 transition-[padding] duration-200 ${
+        inspectorOpen ? 'lg:pr-[28rem]' : ''
+      }`}
+    >
+      <BoardToolbar
+        canManageBoard={canManageBoard}
+        isAdmin={isAdmin}
+        canCreate={canCreate}
+        density={density}
+        onDensity={(d) => {
+          setDensity(d);
+          localStorage.setItem('mirai_board_density', d);
+        }}
+        onEditColumns={openColumnEditor}
+        onSaveTemplate={openSaveTemplate}
+        onNewTask={() => setCreateOpen(true)}
+      />
 
       {editColsOpen && (
         <div
@@ -850,7 +827,7 @@ export function BoardPage() {
         <p className="text-slate-600">Loading board…</p>
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={onDragEnd}>
-          <div className="flex gap-1 overflow-x-auto pb-4">
+          <div className="flex flex-1 gap-1 overflow-x-auto pb-4">
             {columns.map((col) => {
               const colTasks = tasksByStatus.get(col) ?? [];
               const ids = colTasks.map((t) => t.id);

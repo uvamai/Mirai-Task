@@ -5,6 +5,13 @@ import { apiFetch, apiJson } from '../api/client';
 
 type RT = { key: string; label: string; defaultPriority: string };
 
+type ProjectRow = {
+  id: string;
+  name: string;
+  settings?: Record<string, unknown>;
+  boards?: { id: string; name: string }[];
+};
+
 export function ProjectItsmSettingsPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const qc = useQueryClient();
@@ -14,24 +21,34 @@ export function ProjectItsmSettingsPage() {
   });
   const pq = useQuery({
     queryKey: ['projects'],
-    queryFn: () => apiJson<{ projects: { id: string; name: string; settings?: Record<string, unknown> }[] }>('/projects'),
+    queryFn: () => apiJson<{ projects: ProjectRow[] }>('/projects'),
   });
   const project = pq.data?.projects.find((p) => p.id === projectId);
-  const pi = (project?.settings?.publicIntake ?? {}) as { enabled?: boolean; requestTypes?: RT[] };
+  const boards = project?.boards ?? [];
+  const pi = (project?.settings?.publicIntake ?? {}) as {
+    enabled?: boolean;
+    requestTypes?: RT[];
+    targetBoardId?: string | null;
+  };
 
   const [enabled, setEnabled] = useState(false);
-  const [rows, setRows] = useState<RT[]>([{ key: 'incident', label: 'Incident', defaultPriority: 'P2' }]);
+  const [targetBoardId, setTargetBoardId] = useState('');
+  const [rows, setRows] = useState<RT[]>([
+    { key: 'product_feedback', label: 'Product feedback / improvement', defaultPriority: 'P3' },
+    { key: 'incident', label: 'Incident', defaultPriority: 'P2' },
+  ]);
   const [slaUseBusinessDays, setSlaUseBusinessDays] = useState(false);
   const [slaHolidaysText, setSlaHolidaysText] = useState('');
 
   useEffect(() => {
     setEnabled(pi.enabled === true);
+    setTargetBoardId(typeof pi.targetBoardId === 'string' && pi.targetBoardId ? pi.targetBoardId : '');
     if (pi.requestTypes?.length) setRows(pi.requestTypes.map((r) => ({ ...r, defaultPriority: r.defaultPriority ?? 'P3' })));
     const s = project?.settings ?? {};
     setSlaUseBusinessDays(s.slaUseBusinessDays === true);
     const cal = Array.isArray(s.slaHolidayCalendar) ? s.slaHolidayCalendar : [];
     setSlaHolidaysText(cal.filter((x): x is string => typeof x === 'string').join('\n'));
-  }, [project?.settings]);
+  }, [project?.settings, pi.enabled, pi.requestTypes, pi.targetBoardId]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -42,6 +59,7 @@ export function ProjectItsmSettingsPage() {
           publicIntake: {
             enabled,
             requestTypes: rows.filter((r) => r.key.trim() && r.label.trim()),
+            targetBoardId: targetBoardId.trim() ? targetBoardId.trim() : null,
           },
         }),
       });
@@ -84,10 +102,12 @@ export function ProjectItsmSettingsPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <h2 className="text-lg font-bold text-slate-900">ITSM — Public intake</h2>
+        <h2 className="text-lg font-bold text-slate-900">ITSM — Intake &amp; continuous feedback</h2>
         <p className="text-sm text-slate-600">
-          Anonymous request form for <span className="font-semibold">{project?.name ?? 'this project'}</span>. Share the
-          link below (tenant slug comes from your signed-in session).
+          Public form for <span className="font-semibold">{project?.name ?? 'this project'}</span>—incidents, requests, or
+          ongoing product feedback. Share the link below (tenant slug comes from your signed-in session). Route feedback to
+          a dedicated board (for example <span className="font-medium">Product improvement</span>) so it does not land on
+          the default board only.
         </p>
         <p className="mt-2 break-all text-xs text-indigo-800">{publicUrl}</p>
       </div>
@@ -98,6 +118,24 @@ export function ProjectItsmSettingsPage() {
           Enable public intake
         </label>
         <p className="mt-2 text-[11px] text-slate-500">When enabled, at least one request type is required.</p>
+
+        <label className="mt-4 block text-xs font-semibold text-slate-600">Board for new requests</label>
+        <select
+          value={targetBoardId}
+          onChange={(e) => setTargetBoardId(e.target.value)}
+          className="mt-1 w-full max-w-md rounded-lg border border-slate-200 px-3 py-2 text-sm"
+        >
+          <option value="">First board (project default order)</option>
+          {boards.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-[11px] text-slate-500">
+          Intake tasks are created here. Choose your roadmap or feedback board so submissions stay visible with the right
+          workstream.
+        </p>
 
         <div className="mt-4 space-y-3">
           {rows.map((r, i) => (

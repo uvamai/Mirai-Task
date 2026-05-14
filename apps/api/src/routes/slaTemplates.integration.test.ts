@@ -132,4 +132,90 @@ run('SLA policy + board templates (integration)', () => {
     expect(detail.status).toBe(200);
     expect(detail.body.task.slaDeadline).toBeTruthy();
   });
+
+  it('public intake files tasks on publicIntake.targetBoardId when set', async () => {
+    const suffix = randomUUID().slice(0, 8);
+    const reg = await request(app)
+      .post('/auth/register')
+      .send({
+        email: `intake_board_${suffix}@example.com`,
+        password: 'CorrectHorseBattery99!',
+        firstName: 'I',
+        lastName: 'B',
+        organizationName: `Org Intake Board ${suffix}`,
+      });
+    expect(reg.status).toBe(201);
+    const tenantSlug = reg.body.tenant.slug as string;
+    const token = reg.body.accessToken as string;
+    const tenantId = reg.body.tenant.id as string;
+
+    const proj = await request(app)
+      .post('/projects')
+      .set('Authorization', `Bearer ${token}`)
+      .set('X-Tenant-Id', tenantId)
+      .send({ name: `Intake Board Proj ${suffix}` });
+    expect(proj.status).toBe(201);
+    const projectId = proj.body.id as string;
+
+    const boardsRes = await request(app)
+      .get(`/projects/${projectId}/boards`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('X-Tenant-Id', tenantId);
+    expect(boardsRes.status).toBe(200);
+    const firstBoardId = (boardsRes.body.boards as { id: string }[])[0]?.id;
+    expect(firstBoardId).toBeTruthy();
+
+    const second = await request(app)
+      .post(`/projects/${projectId}/boards`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('X-Tenant-Id', tenantId)
+      .send({ name: 'Feedback board', templateKey: 'default' });
+    expect(second.status).toBe(201);
+    const targetBoardId = second.body.id as string;
+
+    const patch = await request(app)
+      .patch(`/projects/${projectId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('X-Tenant-Id', tenantId)
+      .send({
+        publicIntake: {
+          enabled: true,
+          targetBoardId,
+          requestTypes: [{ key: 'feedback', label: 'Feedback', defaultPriority: 'P3' }],
+        },
+      });
+    expect(patch.status).toBe(200);
+
+    const cfg = await request(app).get(
+      `/public/intake/${encodeURIComponent(tenantSlug)}/${encodeURIComponent(projectId)}/config`
+    );
+    expect(cfg.status).toBe(200);
+    expect(cfg.body.intakeBoardName).toBe('Feedback board');
+
+    const intake = await request(app)
+      .post(`/public/intake/${encodeURIComponent(tenantSlug)}/${encodeURIComponent(projectId)}`)
+      .send({
+        title: 'From intake',
+        description: 'body',
+        requestTypeKey: 'feedback',
+        reporterEmail: `reporter_${suffix}@example.com`,
+      });
+    expect(intake.status).toBe(201);
+
+    const onTarget = await request(app)
+      .get(`/boards/${targetBoardId}/tasks`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('X-Tenant-Id', tenantId);
+    expect(onTarget.status).toBe(200);
+    const titles = (onTarget.body.tasks as { title: string }[]).map((t) => t.title);
+    expect(titles.some((t) => t.includes('From intake'))).toBe(true);
+
+    const onFirst = await request(app)
+      .get(`/boards/${firstBoardId}/tasks`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('X-Tenant-Id', tenantId);
+    expect(onFirst.status).toBe(200);
+    const firstTitles = (onFirst.body.tasks as { title: string }[]).map((t) => t.title);
+    expect(firstTitles.some((t) => t.includes('From intake'))).toBe(false);
+  });
 });

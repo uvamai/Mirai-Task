@@ -5,6 +5,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { apiJson } from '../api/client';
 import { TaskDetailPanel } from '../features/tasks/TaskDetailPanel';
 import type { TaskRow, CustomFieldDef } from '../features/tasks/types';
+import { TagPill } from '../components/TagPill';
 
 type TasksPayload = {
   tasks: TaskRow[];
@@ -129,7 +130,16 @@ export function TaskListPage() {
                     tabIndex={0}
                   >
                     <div className="font-semibold text-indigo-700">{t.key}</div>
-                    <div className="min-w-0 truncate text-slate-900">{t.title}</div>
+                    <div className="min-w-0">
+                      <div className="truncate text-slate-900">{t.title}</div>
+                      {(t.tags ?? []).length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {(t.tags ?? []).slice(0, 2).map((tag) => (
+                            <TagPill key={tag} tag={tag} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <div className="text-slate-700">{t.status}</div>
                     <div>{t.priority}</div>
                     <div className="text-slate-600">
@@ -167,7 +177,16 @@ export function TaskListPage() {
                   onClick={() => setSelectedTaskId(t.id)}
                 >
                   <td className="whitespace-nowrap px-3 py-2 font-semibold text-indigo-700">{t.key}</td>
-                  <td className="max-w-xs truncate px-3 py-2 text-slate-900">{t.title}</td>
+                  <td className="max-w-xs px-3 py-2 text-slate-900">
+                    <div className="truncate">{t.title}</div>
+                    {(t.tags ?? []).length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {(t.tags ?? []).slice(0, 2).map((tag) => (
+                          <TagPill key={tag} tag={tag} />
+                        ))}
+                      </div>
+                    )}
+                  </td>
                   <td className="whitespace-nowrap px-3 py-2 text-slate-700">{t.status}</td>
                   <td className="whitespace-nowrap px-3 py-2">{t.priority}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-slate-600">
