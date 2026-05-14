@@ -443,9 +443,15 @@ projectsRouter.post(
         defaultBoardId: board.id,
       });
     } catch (e) {
-      const isPlanLimit = e instanceof PlanLimitError || (e && typeof e === 'object' && (e as any).name === 'PlanLimitError');
+      const isPlanLimit =
+        e instanceof PlanLimitError ||
+        (e && typeof e === 'object' && (e as Record<string, unknown>).name === 'PlanLimitError');
       if (isPlanLimit) {
-        res.status(403).json({ error: (e as Error).message, code: (e as any).code });
+        const errObj = e as Record<string, unknown>;
+        res.status(403).json({
+          error: String(errObj.message ?? 'Plan limit exceeded'),
+          code: String(errObj.code ?? 'LIMIT_PROJECTS'),
+        });
         return;
       }
       logger.error('create project failed', { err: e, requestId: req.requestId });
