@@ -1,5 +1,6 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
+import { AppLauncherModal } from './AppLauncherModal';
 
 type RecentLink = { label: string; to: string; at: number };
 
@@ -35,9 +36,11 @@ export function LeftNav({
   const loc = useLocation();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('mirai_leftnav_collapsed') === '1');
   const [recent, setRecent] = useState<RecentLink[]>(() => loadRecent());
+  const [launcherOpen, setLauncherOpen] = useState(false);
 
   useEffect(() => {
     setRecent(loadRecent());
+    setLauncherOpen(false);
   }, [loc.pathname]);
 
   useEffect(() => {
@@ -61,6 +64,7 @@ export function LeftNav({
       }`}
       aria-label="Primary navigation"
     >
+      <AppLauncherModal open={launcherOpen} onClose={() => setLauncherOpen(false)} isAdmin={isAdmin} />
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-3">
           <Link to="/app" className="min-w-0">
@@ -176,6 +180,23 @@ export function LeftNav({
             </>
           )}
         </nav>
+
+        <div className="px-2 pb-2">
+          <button
+            type="button"
+            onClick={() => setLauncherOpen(true)}
+            className={`flex w-full items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white/90 transition hover:bg-white/15 ${
+              collapsed ? 'justify-center px-2' : ''
+            }`}
+            title="All apps"
+            aria-label="Open apps launcher"
+          >
+            <span className="text-base" aria-hidden>
+              ⧉
+            </span>
+            {!collapsed && <span>All apps</span>}
+          </button>
+        </div>
 
         <div className="custom-scrollbar mt-2 flex-1 overflow-y-auto px-2 pb-3">
           {!collapsed && (

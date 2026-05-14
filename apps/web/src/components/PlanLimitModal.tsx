@@ -1,4 +1,6 @@
+import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 export function PlanLimitModal({
   open,
@@ -13,10 +15,27 @@ export function PlanLimitModal({
   action?: { to: string; label: string };
   onClose: () => void;
 }) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(cardRef, open);
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-      <div className="max-w-md rounded-2xl border border-white/50 bg-white/90 p-6 shadow-2xl">
+      <div
+        ref={cardRef}
+        role="alertdialog"
+        aria-modal="true"
+        aria-label={title}
+        tabIndex={-1}
+        className="max-w-md rounded-2xl border border-white/50 bg-white/90 p-6 shadow-2xl"
+      >
         <h2 className="text-lg font-bold text-slate-900">{title}</h2>
         <p className="mt-2 text-sm text-slate-700">{message}</p>
         <div className="mt-6 flex gap-3">

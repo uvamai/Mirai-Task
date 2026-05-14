@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch, apiJson } from '../api/client';
+import { useFocusTrap } from '../hooks/useFocusTrap';
+import { boardShellAppPath } from '../hooks/useBoardShellView';
 
 type Template = {
   templateKey: string;
@@ -44,7 +46,7 @@ export function CreateBoardModal({ projectId, open, onClose, onCreated }: Props)
     },
     onSuccess: (data) => {
       onCreated(data.id);
-      navigate(`/app/projects/${projectId}/boards/${data.id}`);
+      navigate(boardShellAppPath(projectId, data.id));
       setName('');
       setSelected(null);
       setPreview(null);
@@ -52,11 +54,29 @@ export function CreateBoardModal({ projectId, open, onClose, onCreated }: Props)
     },
   });
 
+  const cardRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(cardRef, open);
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-white/50 bg-white/95 p-6 shadow-2xl">
+      <div
+        ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Create board"
+        tabIndex={-1}
+        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-white/50 bg-white/95 p-6 shadow-2xl"
+      >
         <h2 className="text-lg font-bold text-slate-900">Create board</h2>
         <p className="mt-1 text-xs text-slate-600">Pick a template, preview columns, then name your board.</p>
 

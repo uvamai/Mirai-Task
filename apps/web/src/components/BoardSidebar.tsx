@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useMemo, useState } from 'react';
+import { boardShellAppPath } from '../hooks/useBoardShellView';
 
 export type BoardSidebarBoard = { id: string; name: string };
 
@@ -79,7 +80,7 @@ export function BoardSidebar({
           {filtered.map((b) => (
             <NavLink
               key={b.id}
-              to={`/app/projects/${projectId}/boards/${b.id}`}
+              to={boardShellAppPath(projectId, b.id)}
               className={({ isActive }) =>
                 `flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
                   isActive || b.id === activeBoardId

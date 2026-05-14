@@ -11,17 +11,36 @@ import {
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { io, type Socket } from 'socket.io-client';
 import { apiFetch, apiJson } from '../api/client';
 import { useAppSelector } from '../hooks';
 import { TaskCreateModal } from '../features/tasks/TaskCreateModal';
+import { TaskCardContextMenu } from '../features/tasks/TaskCardContextMenu';
+import { isTaskIdParam } from '../features/tasks/taskDeepLinks';
 import { TaskDetailPanel } from '../features/tasks/TaskDetailPanel';
 import type { CustomFieldDef, TaskRow } from '../features/tasks/types';
 import { Badge } from '../components/ui/Badge';
 import { SlaCountdown } from '../features/tasks/SlaCountdown';
 import { TagPill } from '../components/TagPill';
 import { BoardToolbar } from '../components/board/BoardToolbar';
+import { FieldsPanel } from '../components/board/FieldsPanel';
+import { ImportBanner } from '../components/board/ImportBanner';
+import { ImportExcelModal } from './ImportExcelModal';
+import { useFocusTrap } from '../hooks/useFocusTrap';
+import {
+  EMPTY_FILTERS,
+  matchesFilters,
+  useSavedViews,
+  type SavedView,
+  type SavedViewFilters,
+} from '../hooks/useSavedViews';
+import {
+  applySavedViewColumnSnapshot,
+  prefsDifferFromDefaults,
+  useViewColumnPrefs,
+  type BoardCardFieldKey,
+} from '../hooks/useViewColumnPrefs';
 
 function assigneeInitials(task: TaskRow): string {
   if (task.assigneeType === 'user' && task.assigneeId) return task.assigneeId.replace(/-/g, '').slice(-2).toUpperCase();
@@ -34,11 +53,29 @@ function SortableTaskCard({
   onOpen,
   dense,
   estimateUnit,
+  fieldShow,
+  projectId,
+  boardId,
+  shellPathname,
+  canDuplicate,
+  onDuplicate,
+  onToast,
+  workflowColumns,
+  onMoveTaskStatus,
 }: {
   task: TaskRow;
   onOpen: (id: string) => void;
   dense: boolean;
   estimateUnit: string;
+  fieldShow: Record<BoardCardFieldKey, boolean>;
+  projectId: string;
+  boardId: string;
+  shellPathname: string;
+  canDuplicate: boolean;
+  onDuplicate?: (created: { id: string; key: string }) => void;
+  onToast?: (message: string) => void;
+  workflowColumns: string[];
+  onMoveTaskStatus?: (taskId: string, status: string) => Promise<void>;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
   const style = {
@@ -59,12 +96,16 @@ function SortableTaskCard({
       ref={setNodeRef}
       style={style}
       {...attributes}
+      data-testid="board-card"
+      data-task-key={task.key}
+      data-task-status={task.status}
       className={`glass-card flex gap-1 rounded-xl px-2 ring-1 transition ${
         dense ? 'py-1.5' : 'py-2'
       } ${overdue ? 'border-rose-300 ring-rose-200/80' : 'border-white/60 ring-slate-200/40'}`}
     >
       <button
         type="button"
+        data-testid="board-card-drag-handle"
         className="cursor-grab touch-none px-0.5 text-slate-400 hover:text-slate-700"
         aria-label="Drag to reorder"
         {...listeners}
@@ -73,39 +114,56 @@ function SortableTaskCard({
       </button>
       <button type="button" className="min-w-0 flex-1 text-left" onClick={() => onOpen(task.id)}>
         <div className="flex flex-wrap items-center gap-1">
-          <span className="text-xs font-semibold text-indigo-700">{task.key}</span>
-          <Badge tone="indigo">{task.priority}</Badge>
-          {task.estimate != null && (
+          {fieldShow.key && <span className="text-xs font-semibold text-indigo-700">{task.key}</span>}
+          {fieldShow.priority && <Badge tone="indigo">{task.priority}</Badge>}
+          {fieldShow.estimate && task.estimate != null && (
             <Badge tone="default">
               {task.estimate} {estimateUnit}
             </Badge>
           )}
-          {(task.tags ?? []).slice(0, 2).map((t) => (
-            <TagPill key={t} tag={t} />
-          ))}
-          {(task.tags?.length ?? 0) > 2 && <Badge tone="default">+{task.tags!.length - 2}</Badge>}
+          {fieldShow.tags &&
+            (task.tags ?? []).slice(0, 2).map((t) => (
+              <TagPill key={t} tag={t} />
+            ))}
+          {fieldShow.tags && (task.tags?.length ?? 0) > 2 && <Badge tone="default">+{task.tags!.length - 2}</Badge>}
         </div>
         <div className={`font-medium text-slate-900 ${dense ? 'text-xs' : 'text-sm'}`}>{task.title}</div>
         <div className="mt-1 flex flex-wrap items-center gap-2">
-          <span
-            className="flex h-6 w-6 items-center justify-center rounded-full bg-white/60 text-[10px] font-bold text-slate-700 ring-1 ring-slate-200/40"
-            title={task.assigneeId ?? ''}
-          >
-            {assigneeInitials(task)}
-          </span>
-          <SlaCountdown slaDeadline={task.slaDeadline} paused={Boolean(paused)} />
-          {(task.dependencies?.length ?? 0) > 0 && (
+          {fieldShow.assignee && (
+            <span
+              className="flex h-6 w-6 items-center justify-center rounded-full bg-white/60 text-[10px] font-bold text-slate-700 ring-1 ring-slate-200/40"
+              title={task.assigneeId ?? ''}
+            >
+              {assigneeInitials(task)}
+            </span>
+          )}
+          {fieldShow.sla && <SlaCountdown slaDeadline={task.slaDeadline} paused={Boolean(paused)} />}
+          {fieldShow.deps && (task.dependencies?.length ?? 0) > 0 && (
             <span className="rounded bg-slate-100 px-1 text-[10px] font-semibold text-slate-600" title="Dependencies">
               {task.dependencies!.length} dep
             </span>
           )}
         </div>
-        {task.dueDate && (
+        {fieldShow.dueDate && task.dueDate && (
           <div className="mt-0.5 text-[10px] font-medium text-slate-500">
             Due {typeof task.dueDate === 'string' ? task.dueDate.slice(0, 10) : String(task.dueDate).slice(0, 10)}
           </div>
         )}
       </button>
+      <TaskCardContextMenu
+        task={task}
+        projectId={projectId}
+        boardId={boardId}
+        shellPathname={shellPathname}
+        canDuplicate={canDuplicate}
+        onOpen={onOpen}
+        onDuplicate={onDuplicate}
+        onToast={onToast}
+        workflowColumns={workflowColumns}
+        onMoveToStatus={
+          onMoveTaskStatus ? (status) => onMoveTaskStatus(task.id, status) : undefined
+        }
+      />
     </div>
   );
 }
@@ -128,6 +186,8 @@ function BoardColumn({
         ref={setNodeRef}
         role="list"
         aria-label={`Column ${col}`}
+        data-testid="board-column"
+        data-column={col}
         className={`flex min-h-[320px] min-w-0 flex-1 flex-col gap-2 rounded-2xl border border-white/50 bg-white/50 p-3 shadow-[0_12px_40px_rgba(15,23,42,0.06)] backdrop-blur-md ${
           isOver ? 'ring-2 ring-indigo-400/60' : ''
         }`}
@@ -349,11 +409,50 @@ function BoardRecurringPanel({
 
 export function BoardPage() {
   const { projectId, boardId } = useParams<{ projectId: string; boardId: string }>();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const accessToken = useAppSelector((s) => s.auth.accessToken);
   const qc = useQueryClient();
   const [toast, setToast] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [fieldsPanelOpen, setFieldsPanelOpen] = useState(false);
+  const [fieldsEmphasis, setFieldsEmphasis] = useState<'list' | 'board'>('board');
+  const taskParam = searchParams.get('task');
+  const selectedTaskId = useMemo(() => (isTaskIdParam(taskParam) ? taskParam : null), [taskParam]);
+
+  const openTask = useCallback(
+    (id: string) => {
+      setSearchParams(
+        (prev) => {
+          const n = new URLSearchParams(prev);
+          n.set('task', id);
+          return n;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  const closeTask = useCallback(() => {
+    setSearchParams(
+      (prev) => {
+        const n = new URLSearchParams(prev);
+        n.delete('task');
+        return n;
+      },
+      { replace: true }
+    );
+  }, [setSearchParams]);
+  const [filters, setFilters] = useState<SavedViewFilters>(EMPTY_FILTERS);
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const savedViews = useSavedViews(boardId);
+  const columnPrefs = useViewColumnPrefs(boardId);
+  const layoutDirty = useMemo(() => {
+    const d = prefsDifferFromDefaults(columnPrefs.prefs);
+    return d.list || d.board;
+  }, [columnPrefs.prefs]);
   const [density, setDensity] = useState<'comfortable' | 'dense'>(() => {
     const v = localStorage.getItem('mirai_board_density');
     return v === 'dense' ? 'dense' : 'comfortable';
@@ -422,6 +521,19 @@ export function BoardPage() {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [editColsOpen]);
+
+  const editColsDialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(editColsDialogRef, editColsOpen);
+  const saveTplDialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(saveTplDialogRef, saveTplOpen);
+  useEffect(() => {
+    if (!saveTplOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setSaveTplOpen(false);
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [saveTplOpen]);
 
   const estimateMode = (tasksQ.data?.estimateMode ?? 'story_points') as 'story_points' | 'hours';
   const estimateUnit = tasksQ.data?.estimateUnitLabel ?? 'pts';
@@ -526,13 +638,14 @@ export function BoardPage() {
     const m = new Map<string, TaskRow[]>();
     for (const c of columns) m.set(c, []);
     for (const t of tasksQ.data?.tasks ?? []) {
+      if (!matchesFilters(t, filters)) continue;
       const list = m.get(t.status) ?? [];
       list.push(t);
       m.set(t.status, list);
     }
     for (const [, list] of m) list.sort((a, b) => a.position - b.position);
     return m;
-  }, [columns, tasksQ.data?.tasks]);
+  }, [columns, tasksQ.data?.tasks, filters]);
 
   const patchTask = useMutation({
     mutationFn: async (args: { taskId: string; status?: string; position?: number }) => {
@@ -674,14 +787,8 @@ export function BoardPage() {
 
   if (!projectId || !boardId) return <p className="text-slate-600">Missing board</p>;
 
-  const inspectorOpen = Boolean(selectedTaskId);
-
   return (
-    <div
-      className={`flex min-h-[calc(100vh-220px)] flex-col gap-3 transition-[padding] duration-200 ${
-        inspectorOpen ? 'lg:pr-[28rem]' : ''
-      }`}
-    >
+    <div className="flex min-h-[calc(100vh-220px)] flex-col gap-3">
       <BoardToolbar
         canManageBoard={canManageBoard}
         isAdmin={isAdmin}
@@ -694,6 +801,67 @@ export function BoardPage() {
         onEditColumns={openColumnEditor}
         onSaveTemplate={openSaveTemplate}
         onNewTask={() => setCreateOpen(true)}
+        filters={filters}
+        onFilters={(next) => {
+          setFilters(next);
+          setActiveViewId(null);
+        }}
+        views={savedViews.views}
+        activeViewId={activeViewId}
+        onApplyView={(view: SavedView | null) => {
+          if (!view) {
+            setFilters(EMPTY_FILTERS);
+            setActiveViewId(null);
+            return;
+          }
+          setFilters(view.filters);
+          setActiveViewId(view.id);
+          if (boardId) {
+            applySavedViewColumnSnapshot(boardId, {
+              listColumns: view.listColumns,
+              boardCardFields: view.boardCardFields,
+            });
+            columnPrefs.reload();
+          }
+        }}
+        onSaveView={(name) => {
+          const saved = savedViews.saveView(name, filters, {
+            listColumns: { ...columnPrefs.prefs.list },
+            boardCardFields: { ...columnPrefs.prefs.board },
+          });
+          setActiveViewId(saved.id);
+        }}
+        onDeleteView={(id) => {
+          savedViews.deleteView(id);
+          if (activeViewId === id) setActiveViewId(null);
+        }}
+        onOpenFieldsPanel={() => {
+          setFieldsEmphasis('board');
+          setFieldsPanelOpen(true);
+        }}
+        canSaveView={filters.search.length > 0 || filters.priorities.length > 0 || layoutDirty}
+        fieldToggleSurface="board"
+        boardCardVisibility={columnPrefs.prefs.board}
+        onToggleBoardCard={columnPrefs.toggleBoard}
+      />
+
+      <FieldsPanel
+        open={fieldsPanelOpen}
+        onClose={() => setFieldsPanelOpen(false)}
+        workflowStages={columns}
+        list={columnPrefs.prefs.list}
+        board={columnPrefs.prefs.board}
+        onToggleList={columnPrefs.toggleList}
+        onToggleBoard={columnPrefs.toggleBoard}
+        onResetDefaults={columnPrefs.resetDefaults}
+        emphasis={fieldsEmphasis}
+      />
+
+      <ImportBanner
+        projectId={projectId}
+        boardId={boardId}
+        boardSettings={boardQ.data?.settings}
+        canManage={canManageBoard}
       />
 
       {editColsOpen && (
@@ -705,9 +873,11 @@ export function BoardPage() {
           }}
         >
           <div
+            ref={editColsDialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="col-edit-title"
+            tabIndex={-1}
             className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/60 bg-white p-5 shadow-xl"
           >
             <h2 id="col-edit-title" className="text-lg font-bold text-slate-900">
@@ -748,9 +918,11 @@ export function BoardPage() {
           }}
         >
           <div
+            ref={saveTplDialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="save-tpl-title"
+            tabIndex={-1}
             className="w-full max-w-md rounded-2xl border border-white/60 bg-white p-5 shadow-xl"
           >
             <h2 id="save-tpl-title" className="text-lg font-bold text-slate-900">
@@ -809,6 +981,16 @@ export function BoardPage() {
         onCreated={() => void qc.invalidateQueries({ queryKey: ['tasks', boardId] })}
       />
 
+      <ImportExcelModal
+        projectId={projectId}
+        open={importOpen}
+        onClose={() => {
+          setImportOpen(false);
+          void qc.invalidateQueries({ queryKey: ['projects'] });
+          void qc.invalidateQueries({ queryKey: ['tasks', boardId] });
+        }}
+      />
+
       <TaskDetailPanel
         taskId={selectedTaskId}
         boardId={boardId}
@@ -816,7 +998,7 @@ export function BoardPage() {
         membershipRole={role}
         userId={meQ.data?.user.id}
         estimateMode={estimateMode}
-        onClose={() => setSelectedTaskId(null)}
+        onClose={closeTask}
       />
 
       {toast && (
@@ -825,6 +1007,34 @@ export function BoardPage() {
 
       {tasksQ.isLoading || stagesQ.isLoading || meQ.isLoading || boardQ.isLoading ? (
         <p className="text-slate-600">Loading board…</p>
+      ) : (tasksQ.data?.tasks?.length ?? 0) === 0 ? (
+        <div className="mx-auto max-w-2xl rounded-2xl border border-white/50 bg-white/70 p-8 text-center shadow-sm backdrop-blur-md">
+          <h3 className="text-base font-bold text-slate-900">No tasks on this board yet</h3>
+          <p className="mt-2 text-sm text-slate-600">
+            Add tasks one-by-one, or skip ahead by importing an existing spreadsheet. Each Excel/CSV file
+            becomes its own board with your columns mapped to status, priority, assignee, due date, and tags.
+          </p>
+          {canCreate && (
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCreateOpen(true)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                + New task
+              </button>
+              {canManageBoard && (
+                <button
+                  type="button"
+                  onClick={() => setImportOpen(true)}
+                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white"
+                >
+                  Import from Excel
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={onDragEnd}>
           <div className="flex flex-1 gap-1 overflow-x-auto pb-4">
@@ -849,7 +1059,24 @@ export function BoardPage() {
                         task={t}
                         dense={density === 'dense'}
                         estimateUnit={estimateUnit}
-                        onOpen={setSelectedTaskId}
+                        fieldShow={columnPrefs.prefs.board}
+                        boardId={boardId}
+                        shellPathname={location.pathname}
+                        canDuplicate={canCreate}
+                        onOpen={openTask}
+                        onDuplicate={(c) => {
+                          void qc.invalidateQueries({ queryKey: ['tasks', boardId] });
+                          openTask(c.id);
+                        }}
+                        onToast={(msg) => {
+                          setToast(msg);
+                          setTimeout(() => setToast(null), 4000);
+                        }}
+                        workflowColumns={columns}
+                        projectId={projectId}
+                        onMoveTaskStatus={async (taskId, status) => {
+                          await patchTask.mutateAsync({ taskId, status });
+                        }}
                       />
                     ))}
                   </SortableContext>

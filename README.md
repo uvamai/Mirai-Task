@@ -9,6 +9,7 @@ Roadmap and implementation map: **[docs/jira-parity-roadmap.md](docs/jira-parity
 - **Workflow:** Board/project Kanban stages; API-validated status transitions; optional resolution and blocked SLA metadata.
 - **Tasks:** `dueDate`, validated `metadata` (custom field definitions on the project), `dependencies` with cycle detection, automations on PATCH.
 - **Views:** Kanban, **list**, and **week calendar** (by due date) per board; **reports** for SLA, throughput, and cycle time.
+- **Excel/CSV import (NEW, T17):** drop a spreadsheet, map columns to task fields (status, priority, assignee, due date, tags, custom fields), and MIRAI creates a new board with the rows pre-loaded. Stages can be derived from your `Status` column. Manager/Admin only; plan-tiered row + rate caps; **5-minute undo** after import.
 - **Notifications:** Project **webhooks** (HMAC-signed JSON, retries) for task updates, assignment, and SLA warning/soft breach.
 - **Enterprise / ITSM:** Org policies and **legal hold** (`PATCH /tenant/settings`); **compliance bundle** export when legal hold is on; **public intake** (`/request/:tenantSlug/:projectId`); task **CSAT**, **change calendar** report, ITSM metadata; tenant **audit NDJSON**; **SSO status** probe (full SAML/OIDC login flows still deferred).
 

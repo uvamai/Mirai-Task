@@ -41,6 +41,35 @@ export function PricingPage() {
         {planAvailabilityNotice}
       </p>
 
+      <section className="mb-8 rounded-2xl border border-white/50 bg-white/40 p-5 shadow-sm backdrop-blur-md">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-600/90">
+          Excel/CSV import (every plan)
+        </h2>
+        <p className="mt-2 text-sm text-slate-700">
+          Drop a spreadsheet into any project to create a new board with your columns mapped to status,
+          priority, assignees, due dates, tags, and custom fields. Imported boards count toward your
+          per-project board limit on every plan.
+        </p>
+        <div className="mt-3 grid gap-2 text-xs text-slate-700 md:grid-cols-4">
+          <div className="rounded-xl bg-white/60 px-3 py-2 ring-1 ring-slate-200">
+            <p className="font-semibold text-slate-900">Starter</p>
+            <p>200 rows · 2 imports / hour</p>
+          </div>
+          <div className="rounded-xl bg-white/60 px-3 py-2 ring-1 ring-slate-200">
+            <p className="font-semibold text-slate-900">Standard</p>
+            <p>5,000 rows · 10 imports / hour</p>
+          </div>
+          <div className="rounded-xl bg-white/60 px-3 py-2 ring-1 ring-slate-200">
+            <p className="font-semibold text-slate-900">Pro</p>
+            <p>50,000 rows · 30 imports / hour</p>
+          </div>
+          <div className="rounded-xl bg-white/60 px-3 py-2 ring-1 ring-slate-200">
+            <p className="font-semibold text-slate-900">Enterprise</p>
+            <p>Unlimited (contractual)</p>
+          </div>
+        </div>
+      </section>
+
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
         {planMatrix.map((plan, i) => {
           const publicPlan = limitByCode.get(plan.code);

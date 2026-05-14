@@ -1,8 +1,10 @@
+import { useEffect, useRef } from 'react';
 import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
 import { apiFetch } from '../../api/client';
 import type { CustomFieldDef } from './types';
 import { useTagCatalog } from '../../hooks/useTagCatalog';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -38,6 +40,16 @@ export function TaskCreateModal({
   const UX_TAG = 'UI/UX improvement';
   const tagCatalogQ = useTagCatalog();
   const catalog = tagCatalogQ.data ?? [];
+  const cardRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(cardRef, open);
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
   if (!open) return null;
   const defaultStatus = columns[0] ?? 'Backlog';
   const label =
@@ -61,7 +73,14 @@ export function TaskCreateModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/50 bg-white/95 p-6 shadow-2xl">
+      <div
+        ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="New task"
+        tabIndex={-1}
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/50 bg-white/95 p-6 shadow-2xl"
+      >
         <h2 className="text-lg font-bold text-slate-900">New task</h2>
         <Formik
           initialValues={{

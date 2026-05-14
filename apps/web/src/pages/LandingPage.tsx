@@ -44,6 +44,11 @@ export function LandingPage() {
             <span className="font-semibold text-slate-800">Enterprise-only on an active subscription</span>—with
             local-first development and production parity.
           </p>
+          <p className="max-w-xl text-base text-slate-600">
+            New: <span className="font-semibold text-slate-800">Excel/CSV import</span> on every plan. Drop in a
+            spreadsheet and MIRAI creates a new board with your columns mapped to status, priority, assignees,
+            due dates, and tags.
+          </p>
           <div className="flex flex-wrap gap-4">
             <Link
               to="/register"
@@ -70,6 +75,7 @@ export function LandingPage() {
           <ul className="mt-6 space-y-4 text-slate-700">
             {[
               'Tenant isolation with subscription enforcement',
+              'Excel/CSV import becomes a new board, one file at a time, on every plan',
               'Enterprise subscription unlocks the automation board, agent queue, and governed execution (roadmap)',
               'Immutable audit trail and APIs designed for agent integrations',
               'Glass + neumorphic UI system for consistent polish',

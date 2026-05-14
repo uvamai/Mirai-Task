@@ -17,6 +17,7 @@ import {
   revokeTenantInvitation,
   rotateTenantInvitationToken,
 } from '../services/invitationService';
+import { assertTenantRateLimit, TenantRateLimitError } from '../services/planLimits';
 import { logger } from '../logger';
 
 const acceptLimiter = rateLimit({
@@ -198,6 +199,26 @@ invitationsAdminRouter.post(
     if (!req.tenantId || !req.userId) {
       res.status(400).json({ error: 'Tenant required' });
       return;
+    }
+    /**
+     * P12 — Tenant-scoped invite throttle, layered on top of the per-IP `inviteCreateLimiter`.
+     * Caps a single tenant's bursts even when invites come from many admin sessions.
+     */
+    try {
+      assertTenantRateLimit({
+        tenantId: req.tenantId,
+        key: 'invitation_create',
+        cap: 60,
+        window: 'hour',
+        label: 'Invitation create',
+      });
+    } catch (e) {
+      if (e instanceof TenantRateLimitError) {
+        res.setHeader('Retry-After', String(e.retryAfterSeconds));
+        res.status(429).json({ error: e.message, code: e.code, retryAfterSeconds: e.retryAfterSeconds });
+        return;
+      }
+      throw e;
     }
     try {
       const created = await createTenantInvitation({
