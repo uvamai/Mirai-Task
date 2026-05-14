@@ -404,7 +404,7 @@ projectsRouter.post(
         );
         if (value.seedSampleTasks && tmpl?.sampleTasks?.length) {
           for (const st of tmpl.sampleTasks.slice(0, 8)) {
-            const taskKey = await nextTaskKey(tenantId);
+            const taskKey = await nextTaskKey(tenantId, transaction);
             await Task.create(
               {
                 tenantId,
@@ -443,8 +443,9 @@ projectsRouter.post(
         defaultBoardId: board.id,
       });
     } catch (e) {
-      if (e instanceof PlanLimitError) {
-        res.status(403).json({ error: e.message, code: e.code });
+      const isPlanLimit = e instanceof PlanLimitError || (e && typeof e === 'object' && (e as any).name === 'PlanLimitError');
+      if (isPlanLimit) {
+        res.status(403).json({ error: (e as Error).message, code: (e as any).code });
         return;
       }
       logger.error('create project failed', { err: e, requestId: req.requestId });

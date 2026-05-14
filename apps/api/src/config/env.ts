@@ -1,7 +1,7 @@
 import path from 'path';
 import dotenv from 'dotenv';
 
-const repoRootEnv = path.resolve(__dirname, '../../../.env');
+const repoRootEnv = path.resolve(__dirname, '../../../../.env');
 dotenv.config({ path: repoRootEnv });
 dotenv.config();
 
