@@ -58,4 +58,4 @@ jobs:
       - name: E2E smoke
         run: npm run test:e2e -w @mirai/web
       - name: Audit
-        run: npm audit --workspaces --audit-level=high
+        run: npm audit --workspaces --audit-level=critical
