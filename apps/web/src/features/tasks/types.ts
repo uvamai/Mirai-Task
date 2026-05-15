@@ -24,9 +24,11 @@ export type TaskRow = {
   estimateUnitLabel?: string;
   resolution?: string | null;
   dueDate?: string | null;
+  startDate?: string | null;
   metadata?: Record<string, unknown>;
   dependencies?: string[];
   parentTaskId?: string | null;
+  createdAt: string;
 };
 
 export type ActivityRow = {

@@ -18,6 +18,8 @@ import {
   Tenant,
   TenantMembership,
   User,
+  Document,
+  Form,
 } from '../models';
 import { logger } from '../logger';
 import {
@@ -1775,3 +1777,86 @@ projectScopedRouter.post(
     res.status(207).json({ added, invited, errors });
   }
 );
+// Documents CRUD
+projectScopedRouter.get('/projects/:projectId/documents', authenticateJwt, loadMembership, async (req, res) => {
+  const documents = await Document.findAll({
+    where: { tenantId: req.tenantId!, projectId: req.params.projectId },
+    order: [['createdAt', 'DESC']],
+  });
+  res.json({ documents });
+});
+
+projectScopedRouter.post('/projects/:projectId/documents', authenticateJwt, loadMembership, async (req, res) => {
+  const doc = await Document.create({
+    tenantId: req.tenantId!,
+    projectId: req.params.projectId,
+    title: req.body.title || 'Untitled Document',
+    content: req.body.content || {},
+  });
+  res.status(201).json(doc);
+});
+
+projectScopedRouter.patch('/projects/:projectId/documents/:documentId', authenticateJwt, loadMembership, async (req, res) => {
+  const doc = await Document.findOne({
+    where: { id: req.params.documentId, tenantId: req.tenantId!, projectId: req.params.projectId },
+  });
+  if (!doc) { res.status(404).json({ error: 'Not found' }); return; }
+  
+  if (req.body.title !== undefined) doc.title = req.body.title;
+  if (req.body.content !== undefined) doc.content = req.body.content;
+  await doc.save();
+  res.json(doc);
+});
+
+projectScopedRouter.delete('/projects/:projectId/documents/:documentId', authenticateJwt, loadMembership, async (req, res) => {
+  const n = await Document.destroy({
+    where: { id: req.params.documentId, tenantId: req.tenantId!, projectId: req.params.projectId },
+  });
+  if (!n) { res.status(404).json({ error: 'Not found' }); return; }
+  res.status(204).send();
+});
+
+// Forms CRUD
+projectScopedRouter.get('/projects/:projectId/forms', authenticateJwt, loadMembership, async (req, res) => {
+  const forms = await Form.findAll({
+    where: { tenantId: req.tenantId!, projectId: req.params.projectId },
+    order: [['createdAt', 'DESC']],
+  });
+  res.json({ forms });
+});
+
+projectScopedRouter.post('/projects/:projectId/forms', authenticateJwt, loadMembership, async (req, res) => {
+  const form = await Form.create({
+    tenantId: req.tenantId!,
+    projectId: req.params.projectId,
+    boardId: req.body.boardId,
+    title: req.body.title || 'New Form',
+    description: req.body.description || '',
+    fields: req.body.fields || [],
+    isActive: true,
+  });
+  res.status(201).json(form);
+});
+
+projectScopedRouter.patch('/projects/:projectId/forms/:formId', authenticateJwt, loadMembership, async (req, res) => {
+  const form = await Form.findOne({
+    where: { id: req.params.formId, tenantId: req.tenantId!, projectId: req.params.projectId },
+  });
+  if (!form) { res.status(404).json({ error: 'Not found' }); return; }
+  
+  if (req.body.title !== undefined) form.title = req.body.title;
+  if (req.body.description !== undefined) form.description = req.body.description;
+  if (req.body.boardId !== undefined) form.boardId = req.body.boardId;
+  if (req.body.fields !== undefined) form.fields = req.body.fields;
+  if (req.body.isActive !== undefined) form.isActive = req.body.isActive;
+  await form.save();
+  res.json(form);
+});
+
+projectScopedRouter.delete('/projects/:projectId/forms/:formId', authenticateJwt, loadMembership, async (req, res) => {
+  const n = await Form.destroy({
+    where: { id: req.params.formId, tenantId: req.tenantId!, projectId: req.params.projectId },
+  });
+  if (!n) { res.status(404).json({ error: 'Not found' }); return; }
+  res.status(204).send();
+});

@@ -261,6 +261,7 @@ tasksRouter.post(
       position: Date.now(),
       resolution: null,
       dueDate: value.dueDate ?? null,
+      startDate: value.startDate ?? null,
       metadata: value.metadata ?? {},
       parentTaskId: value.parentTaskId ?? null,
     });
@@ -667,6 +668,7 @@ tasksRouter.patch(
     }
     if (value.resolution !== undefined) task.resolution = value.resolution || null;
     if (value.dueDate !== undefined) task.dueDate = value.dueDate;
+    if (value.startDate !== undefined) task.startDate = value.startDate;
     if (value.metadata !== undefined) task.metadata = { ...task.metadata, ...value.metadata };
     if (value.dependencies !== undefined) task.dependencies = value.dependencies;
     if (value.position !== undefined) task.position = value.position;

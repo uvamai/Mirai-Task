@@ -22,6 +22,8 @@ import { RecurringTaskRule } from './RecurringTaskRule';
 import { ContactSalesLead } from './ContactSalesLead';
 import { TaskRelation } from './TaskRelation';
 import { ImportJob } from './ImportJob';
+import { Document } from './Document';
+import { Form } from './Form';
 
 User.hasMany(TenantMembership, { foreignKey: 'userId' });
 TenantMembership.belongsTo(User, { foreignKey: 'userId' });
@@ -130,6 +132,20 @@ ImportJob.belongsTo(User, { foreignKey: 'userId' });
 Board.hasOne(ImportJob, { foreignKey: 'boardId' });
 ImportJob.belongsTo(Board, { foreignKey: 'boardId' });
 
+Tenant.hasMany(Document, { foreignKey: 'tenantId' });
+Document.belongsTo(Tenant, { foreignKey: 'tenantId' });
+Project.hasMany(Document, { foreignKey: 'projectId' });
+Document.belongsTo(Project, { foreignKey: 'projectId' });
+Document.belongsTo(User, { foreignKey: 'createdBy', as: 'Creator' });
+Document.belongsTo(User, { foreignKey: 'updatedBy', as: 'Updater' });
+
+Tenant.hasMany(Form, { foreignKey: 'tenantId' });
+Form.belongsTo(Tenant, { foreignKey: 'tenantId' });
+Project.hasMany(Form, { foreignKey: 'projectId' });
+Form.belongsTo(Project, { foreignKey: 'projectId' });
+Board.hasMany(Form, { foreignKey: 'boardId' });
+Form.belongsTo(Board, { foreignKey: 'boardId' });
+
 export {
   sequelize,
   User,
@@ -155,4 +171,6 @@ export {
   ContactSalesLead,
   TaskRelation,
   ImportJob,
+  Document,
+  Form,
 };

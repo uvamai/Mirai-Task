@@ -13,6 +13,7 @@ export const createTaskSchema = Joi.object({
   tags: Joi.array().items(Joi.string()).default([]),
   estimate: Joi.number().min(0).allow(null),
   dueDate: Joi.string().isoDate().allow(null),
+  startDate: Joi.string().isoDate().allow(null),
   metadata: Joi.object().unknown(true).default({}),
   parentTaskId: Joi.string().uuid().allow(null).optional(),
 });
@@ -28,6 +29,7 @@ export const patchTaskSchema = Joi.object({
   resolution: Joi.string().allow('', null).max(8000),
   blockedReason: Joi.string().allow('', null).max(2000),
   dueDate: Joi.string().isoDate().allow(null),
+  startDate: Joi.string().isoDate().allow(null),
   metadata: Joi.object().unknown(true),
   dependencies: Joi.array().items(Joi.string().uuid()).max(25),
   parentTaskId: Joi.string().uuid().allow(null),

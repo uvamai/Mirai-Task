@@ -23,6 +23,7 @@ export interface TaskAttributes {
   position: number;
   resolution: string | null;
   dueDate: string | null;
+  startDate: string | null;
   metadata: Record<string, unknown>;
   parentTaskId: string | null;
   createdAt: Date;
@@ -45,6 +46,7 @@ type TaskCreation = Optional<
   | 'position'
   | 'resolution'
   | 'dueDate'
+  | 'startDate'
   | 'metadata'
   | 'parentTaskId'
   | 'createdAt'
@@ -72,6 +74,7 @@ export class Task extends Model<TaskAttributes, TaskCreation> implements TaskAtt
   declare position: number;
   declare resolution: string | null;
   declare dueDate: string | null;
+  declare startDate: string | null;
   declare metadata: Record<string, unknown>;
   declare parentTaskId: string | null;
   declare createdAt: Date;
@@ -100,7 +103,8 @@ Task.init(
     position: { type: DataTypes.DOUBLE, allowNull: false, defaultValue: 0 },
     resolution: { type: DataTypes.TEXT, allowNull: true },
     dueDate: { type: DataTypes.DATEONLY, allowNull: true, field: 'due_date' },
-    metadata: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
+    startDate: { type: DataTypes.DATEONLY, allowNull: true, field: 'start_date' },
+    metadata: { type: DataTypes.JSONB, allowNull: false, defaultValue: {}, field: 'metadata' },
     parentTaskId: { type: DataTypes.UUID, allowNull: true, field: 'parent_task_id' },
     createdAt: { type: DataTypes.DATE, allowNull: false, field: 'created_at' },
     updatedAt: { type: DataTypes.DATE, allowNull: false, field: 'updated_at' },

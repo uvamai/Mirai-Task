@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import Joi from 'joi';
-import { Board, Project, Task, Tenant } from '../models';
+import { Board, Project, Task, Tenant, Form } from '../models';
 import { nextTaskKey } from '../services/taskKeys';
 import { resolveWorkflowStageNames } from '../services/workflowService';
 import { validateTaskMetadata } from '../services/customFields';
@@ -203,6 +203,87 @@ intakePublicRouter.post('/public/intake/:tenantSlug/:projectId', intakeLimiter, 
     taskId: task.id,
     actorType: 'system',
     action: 'task.create.public_intake',
+    entityType: 'task',
+    entityId: task.id,
+    after: taskToSnapshot(task),
+  });
+
+  emitBoardTasksUpdated(tenant.id, board.id, project.id);
+  res.status(201).json({ ok: true, taskKey: task.key });
+});
+
+intakePublicRouter.get('/public/forms/:formId', async (req, res) => {
+  const form = await Form.findByPk(req.params.formId, {
+    include: [{ model: Project, attributes: ['name'] }, { model: Tenant, attributes: ['name'] }],
+  });
+  if (!form || !form.isActive) {
+    res.status(404).json({ error: 'Form not found or inactive' });
+    return;
+  }
+  res.json({
+    id: form.id,
+    title: form.title,
+    description: form.description,
+    fields: form.fields,
+    projectName: (form as any).Project?.name,
+    tenantName: (form as any).Tenant?.name,
+  });
+});
+
+intakePublicRouter.post('/public/forms/:formId/submit', intakeLimiter, async (req, res) => {
+  const form = await Form.findByPk(req.params.formId);
+  if (!form || !form.isActive) {
+    res.status(404).json({ error: 'Form not found or inactive' });
+    return;
+  }
+
+  const project = await Project.findByPk(form.projectId);
+  const tenant = await Tenant.findByPk(form.tenantId);
+  const board = await Board.findByPk(form.boardId);
+
+  if (!project || !tenant || !board) {
+    res.status(500).json({ error: 'Form configuration error' });
+    return;
+  }
+
+  const values = req.body.values || {};
+  const reporterEmail = String(req.body.reporterEmail || '').trim().toLowerCase();
+
+  if (!reporterEmail) {
+    res.status(400).json({ error: 'Reporter email is required' });
+    return;
+  }
+
+  const wf = resolveWorkflowStageNames(board, project);
+  const firstStatus = wf[0] ?? 'Backlog';
+
+  const metadata = {
+    source: 'custom_form',
+    formId: form.id,
+    reporterEmail,
+    formValues: values,
+  };
+
+  const key = await nextTaskKey(tenant.id);
+  const task = await Task.create({
+    tenantId: tenant.id,
+    projectId: project.id,
+    boardId: board.id,
+    key,
+    title: `${form.title}: ${values[form.fields[0]?.label] || 'New Submission'}`,
+    description: `Form Submission: ${form.title}\n\n` + 
+      form.fields.map(f => `${f.label}: ${values[f.label] || ''}`).join('\n'),
+    priority: 'P3',
+    status: firstStatus,
+    metadata,
+    position: Date.now(),
+  });
+
+  await logActivity({
+    tenantId: tenant.id,
+    taskId: task.id,
+    actorType: 'system',
+    action: 'task.create.custom_form',
     entityType: 'task',
     entityId: task.id,
     after: taskToSnapshot(task),

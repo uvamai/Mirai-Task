@@ -17,11 +17,15 @@ import { LegacyBoardRedirect } from './pages/LegacyBoardRedirect';
 import { ProjectBoardIndex } from './pages/ProjectBoardIndex';
 import { TaskListPage } from './pages/TaskListPage';
 import { TaskCalendarPage } from './pages/TaskCalendarPage';
+import { TaskGanttPage } from './pages/TaskGanttPage';
+import { TaskTablePage } from './pages/TaskTablePage';
 import { AcceptInvitePage } from './pages/AcceptInvitePage';
 import { PublicIntakePage } from './pages/PublicIntakePage';
 import { TenantOrgSettingsPage } from './pages/TenantOrgSettingsPage';
 import { MyWorkPage } from './pages/MyWorkPage';
 import { ProjectItsmSettingsPage } from './pages/ProjectItsmSettingsPage';
+import { ProjectDocsPage } from './pages/ProjectDocsPage';
+import { ProjectFormsPage } from './pages/ProjectFormsPage';
 import { ProjectAutomationsPage } from './pages/ProjectAutomationsPage';
 import { ProjectGettingStartedPage } from './pages/ProjectGettingStartedPage';
 import { ProjectTemplatesPage } from './pages/ProjectTemplatesPage';
@@ -50,9 +54,14 @@ export default function App() {
           <Route path="boards/:boardId/list" element={<TaskListPage />} />
           <Route path="boards/:boardId/table" element={<TaskListPage />} />
           <Route path="boards/:boardId/calendar" element={<TaskCalendarPage />} />
+          <Route path="boards/:boardId/gantt" element={<TaskGanttPage />} />
+          <Route path="boards/:boardId/timeline" element={<TaskGanttPage />} />
+          <Route path="boards/:boardId/table" element={<TaskTablePage />} />
           <Route path="boards/:boardId" element={<BoardPage />} />
           <Route path="getting-started" element={<ProjectGettingStartedPage />} />
           <Route path="templates" element={<ProjectTemplatesPage />} />
+          <Route path="docs" element={<ProjectDocsPage />} />
+          <Route path="forms" element={<ProjectFormsPage />} />
           <Route path="team" element={<ProjectTeamPage />} />
           <Route path="reports" element={<ProjectReportsPage />} />
           <Route path="automations" element={<ProjectAutomationsPage />} />

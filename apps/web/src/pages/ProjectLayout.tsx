@@ -9,6 +9,7 @@ import { ProjectTabs } from '../components/project/ProjectTabs';
 import { BoardSwitcher } from '../components/project/BoardSwitcher';
 import { useRecentNavigation } from '../hooks/useRecentNavigation';
 import { boardShellAppPath, parseBoardIdFromProjectPath, shellViewFromPathname, setBoardShellView } from '../hooks/useBoardShellView';
+import { ViewsModal } from '../components/project/ViewsModal';
 
 type ProjectRow = {
   id: string;
@@ -27,6 +28,7 @@ export function ProjectLayout() {
   const [createBoardOpen, setCreateBoardOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const { push: pushRecent } = useRecentNavigation();
+  const [viewsModalOpen, setViewsModalOpen] = useState(false);
 
   const meQ = useQuery({
     queryKey: ['me-project-layout'],
@@ -128,6 +130,13 @@ export function ProjectLayout() {
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setViewsModalOpen(true)}
+                className="rounded-xl border border-indigo-200 bg-indigo-50/50 px-3 py-2 text-sm font-bold text-indigo-700 hover:bg-indigo-50 shadow-sm"
+              >
+                Views
+              </button>
               {canManage && (
                 <>
                   <button
@@ -197,6 +206,15 @@ export function ProjectLayout() {
             }}
           />
         </>
+      )}
+
+      {projectId && (
+        <ViewsModal
+          projectId={projectId}
+          boardId={boardId}
+          open={viewsModalOpen}
+          onClose={() => setViewsModalOpen(false)}
+        />
       )}
     </div>
   );
