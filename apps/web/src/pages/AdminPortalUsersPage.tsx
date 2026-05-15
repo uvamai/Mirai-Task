@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useOutletContext, Navigate } from 'react-router-dom';
 import { delegateSuperAdmin, fetchAdminUsers, fetchSuperAdmins, revokeSuperAdmin, updateUserLoginStatus } from '../api/globalAdmin';
 
 export function AdminPortalUsersPage() {
   const qc = useQueryClient();
+  const { isGlobalAdmin } = useOutletContext<{ isGlobalAdmin?: boolean }>();
   const [query, setQuery] = useState('');
   const [isLoginActive, setIsLoginActive] = useState('');
   const [page, setPage] = useState(1);
@@ -17,19 +19,25 @@ export function AdminPortalUsersPage() {
     p.set('pageSize', String(pageSize));
     return p;
   }, [query, isLoginActive, page, pageSize]);
+  
   const q = useQuery({
     queryKey: ['admin-users', params.toString()],
     queryFn: () => fetchAdminUsers(params),
+    enabled: isGlobalAdmin !== false,
   });
+  
+  const superAdminsQ = useQuery({
+    queryKey: ['super-admins'],
+    queryFn: fetchSuperAdmins,
+    enabled: isGlobalAdmin !== false,
+  });
+
   const mut = useMutation({
     mutationFn: ({ userId, active }: { userId: string; active: boolean }) =>
       updateUserLoginStatus(userId, active),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin-users'] }),
   });
-  const superAdminsQ = useQuery({
-    queryKey: ['super-admins'],
-    queryFn: fetchSuperAdmins,
-  });
+
   const delegateMut = useMutation({
     mutationFn: (email: string) => delegateSuperAdmin(email),
     onSuccess: () => {
@@ -45,6 +53,10 @@ export function AdminPortalUsersPage() {
       void qc.invalidateQueries({ queryKey: ['admin-users'] });
     },
   });
+
+  if (isGlobalAdmin === false) {
+    return <Navigate to="/app" replace />;
+  }
   const totalPages = Math.max(1, Math.ceil((q.data?.total ?? 0) / (q.data?.pageSize ?? pageSize)));
 
   return (

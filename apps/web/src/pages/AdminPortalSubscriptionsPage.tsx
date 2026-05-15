@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useOutletContext, Navigate } from 'react-router-dom';
 import { fetchAdminSubscriptions, updateSubscription } from '../api/globalAdmin';
 
 export function AdminPortalSubscriptionsPage() {
   const qc = useQueryClient();
+  const { isGlobalAdmin } = useOutletContext<{ isGlobalAdmin?: boolean }>();
   const [tenantQuery, setTenantQuery] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -14,15 +16,22 @@ export function AdminPortalSubscriptionsPage() {
     p.set('pageSize', String(pageSize));
     return p;
   }, [tenantQuery, page, pageSize]);
+  
   const q = useQuery({
     queryKey: ['admin-subs', params.toString()],
     queryFn: () => fetchAdminSubscriptions(params),
+    enabled: isGlobalAdmin !== false,
   });
+
   const mut = useMutation({
     mutationFn: ({ tenantId, payload }: { tenantId: string; payload: { status?: string; planCode?: string; extendDays?: number } }) =>
       updateSubscription(tenantId, payload),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin-subs'] }),
   });
+
+  if (isGlobalAdmin === false) {
+    return <Navigate to="/app" replace />;
+  }
   const totalPages = Math.max(1, Math.ceil((q.data?.total ?? 0) / (q.data?.pageSize ?? pageSize)));
 
   return (

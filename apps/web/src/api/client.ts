@@ -13,7 +13,19 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
   for (const [k, v] of Object.entries(base)) {
     if (!headers.has(k)) headers.set(k, v);
   }
-  return fetch(`/api${path}`, { ...init, headers });
+  const res = await fetch(`/api${path}`, { ...init, headers });
+  
+  // Automatically redirect to login and clear credentials on 401 Unauthorized
+  if (res.status === 401 && !path.startsWith('/auth/login') && !path.startsWith('/auth/register')) {
+    localStorage.removeItem('mirai_access_token');
+    localStorage.removeItem('mirai_tenant_id');
+    localStorage.removeItem('mirai_refresh_token');
+    if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
+      window.location.href = '/login?expired=true';
+    }
+  }
+  
+  return res;
 }
 
 export async function apiJson<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -23,6 +35,7 @@ export async function apiJson<T>(path: string, init: RequestInit = {}): Promise<
     const err = new Error((body as { error?: string }).error ?? res.statusText);
     const code = (body as { code?: string }).code;
     if (code) (err as Error & { code?: string }).code = code;
+    (err as Error & { status?: number }).status = res.status;
     throw err;
   }
   return body as T;

@@ -187,6 +187,7 @@ export class TenantRateLimitError extends PlanLimitError {
     super(code, message);
     this.name = 'TenantRateLimitError';
     this.retryAfterSeconds = retryAfterSeconds;
+    Object.setPrototypeOf(this, TenantRateLimitError.prototype);
   }
 }
 
