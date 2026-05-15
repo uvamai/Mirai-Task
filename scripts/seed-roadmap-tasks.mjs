@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Seed or sync tasks from docs/ROADMAP-TODOS.md onto boards: T, P, A, M (Product improvement).
+ * Seed or sync tasks from docs/ROADMAP-TODOS.md onto boards: T, P, A, M (Product improvement), PM (ClickUp-style PM shell / parity).
  *
  * Defaults (override via env if needed):
  * - Roadmap **Open** → column **Backlog** (`ROADMAP_STATUS_OPEN`, same as todo by default).
@@ -15,7 +15,7 @@
  *   MIRAI_PROJECT_ID      Project UUID (required)
  *   MIRAI_EMAIL / MIRAI_PASSWORD  Optional login if token not set
  *   ROADMAP_MD            Path to markdown (default <repo>/docs/ROADMAP-TODOS.md)
- *   MIRAI_ROADMAP_BOARD_T / _P / _A / _M  Optional existing board UUIDs (skip auto-create)
+ *   MIRAI_ROADMAP_BOARD_T / _P / _A / _M / _PM  Optional existing board UUIDs (skip auto-create)
  *   DRY_RUN=1             Log only
  *   REFRESH_COMMENTS=1    After an actual update, also post a sync comment (still skipped when unchanged)
  *   ROADMAP_COMPLETION_COMMENTS=1  When a row moves to Done (was not Done on last sync), post a delivery comment
@@ -78,11 +78,14 @@ const STATUS_DONE = process.env.ROADMAP_STATUS_DONE ?? process.env.ROADMAP_DONE_
 /** Fixed board workflow (API needs ≥3 stages; transitions to Done may pass through middle). */
 const BOARD_WORKFLOW = ['Backlog', 'In Progress', 'Done'];
 
+const ROADMAP_GROUPS = ['T', 'P', 'A', 'M', 'PM'];
+
 const BOARD_NAMES = {
   T: process.env.MIRAI_ROADMAP_NAME_T ?? 'Roadmap T',
   P: process.env.MIRAI_ROADMAP_NAME_P ?? 'Roadmap P',
   A: process.env.MIRAI_ROADMAP_NAME_A ?? 'Roadmap A',
   M: process.env.MIRAI_ROADMAP_NAME_M ?? 'Product improvement',
+  PM: process.env.MIRAI_ROADMAP_NAME_PM ?? 'Roadmap PM',
 };
 
 const TEMPLATE_KEY = process.env.MIRAI_ROADMAP_TEMPLATE ?? 'default';
@@ -97,6 +100,7 @@ function roadmapUid(row) {
 
 function inferGroup(id) {
   const s = String(id).trim();
+  if (/^PM\d+$/i.test(s)) return 'PM';
   if (/^A\d+$/i.test(s)) return 'A';
   if (/^M\d+$/i.test(s)) return 'M';
   if (/^P\d+$/i.test(s)) return 'P';
@@ -183,7 +187,7 @@ function parseItemSpecs(md) {
     const firstLineEnd = trimmed.indexOf('\n');
     const head = firstLineEnd === -1 ? trimmed : trimmed.slice(0, firstLineEnd);
     const body = firstLineEnd === -1 ? '' : trimmed.slice(firstLineEnd + 1).trim();
-    const idMatch = head.match(/^###\s+([A-Z]?\d+[a-z]?)\b/i);
+    const idMatch = head.match(/^###\s+([A-Z][A-Z]?\d+[a-z]?)\b/i);
     if (!idMatch) continue;
     map[idMatch[1]] = body;
   }
@@ -230,12 +234,13 @@ async function ensureBoards({ token, tenantId, projectId }) {
     P: process.env.MIRAI_ROADMAP_BOARD_P,
     A: process.env.MIRAI_ROADMAP_BOARD_A,
     M: process.env.MIRAI_ROADMAP_BOARD_M,
+    PM: process.env.MIRAI_ROADMAP_BOARD_PM,
   };
   const existing = await apiFetch(`/projects/${projectId}/boards`, { token, tenantId });
   const byName = new Map((existing.boards ?? []).map((b) => [b.name, b]));
-  const out = { T: null, P: null, A: null, M: null };
+  const out = { T: null, P: null, A: null, M: null, PM: null };
 
-  for (const g of ['T', 'P', 'A', 'M']) {
+  for (const g of ROADMAP_GROUPS) {
     if (envBoards[g]) {
       out[g] = { id: envBoards[g], name: BOARD_NAMES[g] };
       continue;
@@ -501,7 +506,7 @@ async function main() {
     console.error('No roadmap rows parsed. Check table format in ROADMAP-TODOS.md');
     process.exit(1);
   }
-  const byGroup = Object.fromEntries(['T', 'P', 'A', 'M'].map((g) => [g, rows.filter((r) => r.group === g).length]));
+  const byGroup = Object.fromEntries(ROADMAP_GROUPS.map((g) => [g, rows.filter((r) => r.group === g).length]));
   console.log('Parsed roadmap rows by board group:', byGroup);
   const specById = {
     ...parseItemSpecs(md),
@@ -513,7 +518,7 @@ async function main() {
 
   const boards = await ensureBoards({ token, tenantId, projectId });
 
-  for (const g of ['T', 'P', 'A', 'M']) {
+  for (const g of ROADMAP_GROUPS) {
     const boardId = boards[g].id;
     const groupRows = rows.filter((r) => r.group === g);
     const { tasks: existingTasks, workflowStages } = await getBoardTasks(token, tenantId, boardId);
@@ -529,14 +534,15 @@ async function main() {
 
   console.log('Roadmap sync finished.', {
     tasks: rows.length,
-    boardIds: { T: boards.T.id, P: boards.P.id, A: boards.A.id, M: boards.M.id },
-    boardNames: { T: boards.T.name, P: boards.P.name, A: boards.A.name, M: boards.M.name },
+    boardIds: Object.fromEntries(ROADMAP_GROUPS.map((g) => [g, boards[g].id])),
+    boardNames: Object.fromEntries(ROADMAP_GROUPS.map((g) => [g, boards[g].name])),
     dryRun: DRY_RUN,
   });
   console.log(
-    'Open the M board in the app with boardId:',
+    'Pin boards in .env.roadmap, e.g. MIRAI_ROADMAP_BOARD_M=',
     boards.M.id,
-    '(set MIRAI_ROADMAP_BOARD_M in .env.roadmap to pin this board for future syncs.)'
+    'MIRAI_ROADMAP_BOARD_PM=',
+    boards.PM.id
   );
 }
 

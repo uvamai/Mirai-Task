@@ -137,7 +137,7 @@ export function AppShell() {
       </a>
       <div className="flex w-full">
         <LeftNav tenantName={tenantName} isAdmin={isAdmin} onCollapseChange={setLeftCollapsed} />
-        <div className="min-w-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <TopCommandBar
             tenantName={tenantName}
             unread={unread}
@@ -151,7 +151,11 @@ export function AppShell() {
           />
           <main
             id="app-main-content"
-            className={isProjectArea ? 'w-full px-0 py-0' : 'mx-auto max-w-6xl px-6 py-10'}
+            className={
+              isProjectArea
+                ? 'min-h-0 w-full flex-1 px-0 py-0'
+                : 'mx-auto min-h-0 w-full max-w-6xl flex-1 px-6 py-10'
+            }
             tabIndex={-1}
           >
             <Outlet />

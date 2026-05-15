@@ -21,6 +21,7 @@ Positioning target: mid-market growth (strong team value in Standard, operationa
 | Core work management | Custom board columns (`kanbanStages`) | No | Yes | Yes | Yes | Current |
 | Core work management | Column resize (`columnWidths`) | No | Yes | Yes | Yes | Current |
 | Core work management | Advanced board personalization | No | Yes | Yes | Yes | Current; includes workflow-stage editing |
+| Core work management | Excel/CSV import → new board with dynamic column mapping | Yes | Yes | Yes | Yes | Current (T17); plan-tiered row + rate caps below |
 | Collaboration | Roles (Admin/Manager/Employee) | No | Yes | Yes | Yes | Current |
 | Collaboration | Invite links with accept URL | No | Yes | Yes | Yes | Current |
 | Collaboration | Revoke/regenerate invites | No | Yes | Yes | Yes | Current |
@@ -51,12 +52,14 @@ Positioning target: mid-market growth (strong team value in Standard, operationa
 
 ## Limits and support SLA
 
-| Plan | Users | Projects | Task volume | Templates | Support |
-|---|---:|---:|---:|---|---|
-| Free | Up to 3 | Up to 2 | Up to 200 total tasks | Starter built-ins only | Community/self-serve |
-| Standard | Up to 25 | Up to 20 | Up to 20,000 tasks | Full built-in catalog | Email support, best-effort next business day |
-| Pro | 100 included (expandable) | Up to 100 | Up to 200,000 tasks | Built-ins + org custom templates | Priority support, 8x5 SLA target |
-| Enterprise | Contractual | Contractual | Contractual | Full + governance controls | Dedicated channel, custom SLA |
+| Plan | Users | Projects | Task volume | Templates | Excel import (rows / hour) | Support |
+|---|---:|---:|---:|---|---|---|
+| Free | Up to 3 | Up to 2 | Up to 200 total tasks | Starter built-ins only | 200 rows / 2 imports per hour | Community/self-serve |
+| Standard | Up to 25 | Up to 20 | Up to 20,000 tasks | Full built-in catalog | 5,000 rows / 10 imports per hour | Email support, best-effort next business day |
+| Pro | 100 included (expandable) | Up to 100 | Up to 200,000 tasks | Built-ins + org custom templates | 50,000 rows / 30 imports per hour | Priority support, 8x5 SLA target |
+| Enterprise | Contractual | Contractual | Contractual | Full + governance controls | Unlimited (contractual) | Dedicated channel, custom SLA |
+
+Imported boards count toward each plan's per-project board cap (Free=3, Standard=10, Pro=25, Enterprise=unlimited).
 
 ## Current vs planned summary
 

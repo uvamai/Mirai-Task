@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test('pricing page renders headline', async ({ page }) => {
   await page.goto('/pricing');
-  await expect(page.getByRole('heading', { name: /Per-tenant/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /subscription plans/i })).toBeVisible();
 });
 
 test('landing page renders hero', async ({ page }) => {

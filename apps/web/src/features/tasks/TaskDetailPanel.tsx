@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
@@ -7,6 +8,8 @@ import type { ActivityRow, CustomFieldDef, EmployeeOption, TaskRow } from './typ
 import { SlaCountdown } from './SlaCountdown';
 import { TagPill } from '../../components/TagPill';
 import { useTagCatalog } from '../../hooks/useTagCatalog';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
+import { formatCommentBody, type MentionDisplay } from './formatMentions';
 
 function estimateSchema(mode: 'story_points' | 'hours') {
   if (mode === 'hours') {
@@ -81,12 +84,28 @@ export function TaskDetailPanel({
   const tagCatalogQ = useTagCatalog();
   const catalog = tagCatalogQ.data ?? [];
   const [tagInput, setTagInput] = useState('');
+  const [relatedUuid, setRelatedUuid] = useState('');
+  const [relatedErr, setRelatedErr] = useState<string | null>(null);
+  const { projectId } = useParams<{ projectId: string }>();
 
   const detailQ = useQuery({
     queryKey: ['task', taskId],
     enabled: Boolean(taskId),
     queryFn: () => apiJson<DetailResponse>(`/tasks/${taskId}`),
   });
+
+  const cardRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(cardRef, Boolean(taskId));
+
+  /** Close on Escape while the modal is open. */
+  useEffect(() => {
+    if (!taskId) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [taskId, onClose]);
 
   const tags = useMemo(
     () => (detailQ.data?.task?.tags ?? []).filter((t) => typeof t === 'string' && t.trim()),
@@ -176,6 +195,47 @@ export function TaskDetailPanel({
     },
   });
 
+  const relatedQ = useQuery({
+    queryKey: ['task-related', taskId],
+    enabled: Boolean(taskId),
+    queryFn: () =>
+      apiJson<{ related: { id: string; key: string; title: string; status: string; boardId?: string }[] }>(
+        `/tasks/${taskId}/related`
+      ),
+  });
+
+  const addRelatedTask = useMutation({
+    mutationFn: async (toTaskId: string) => {
+      if (!taskId) throw new Error('No task');
+      const res = await apiFetch(`/tasks/${taskId}/related`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ toTaskId }),
+      });
+      const b = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((b as { error?: string }).error ?? 'Failed to add link');
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['task-related', taskId] });
+      void qc.invalidateQueries({ queryKey: ['task', taskId] });
+      void qc.invalidateQueries({ queryKey: ['tasks', boardId] });
+    },
+  });
+
+  const removeRelatedTask = useMutation({
+    mutationFn: async (otherId: string) => {
+      if (!taskId) throw new Error('No task');
+      const res = await apiFetch(`/tasks/${taskId}/related/${otherId}`, { method: 'DELETE' });
+      const b = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((b as { error?: string }).error ?? 'Failed to remove link');
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['task-related', taskId] });
+      void qc.invalidateQueries({ queryKey: ['task', taskId] });
+      void qc.invalidateQueries({ queryKey: ['tasks', boardId] });
+    },
+  });
+
   if (!taskId) return null;
 
   const task = detailQ.data?.task;
@@ -189,6 +249,7 @@ export function TaskDetailPanel({
     membershipRole === 'EMPLOYEE' && task?.assigneeType === 'user' && task.assigneeId === userId;
   const canEditFields = canManage || employeeOnlyEdit;
   const canEditP0 = canManage;
+  const canEditRelated = canManage || employeeOnlyEdit;
 
   const paused =
     task?.slaState && typeof task.slaState === 'object' && 'paused' in task.slaState && (task.slaState as { paused?: boolean }).paused;
@@ -208,32 +269,39 @@ export function TaskDetailPanel({
   }
 
   return (
-    <>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
       <div
-        className="fixed inset-0 z-40 bg-slate-900/35 backdrop-blur-[1px] sm:hidden"
-        role="presentation"
-        onMouseDown={onClose}
-      />
-      <div className="glass-panel fixed inset-y-0 right-0 z-50 flex w-full sm:max-w-md flex-col border-l border-white/40">
-      <div className="flex items-center justify-between gap-2 border-b border-white/40 px-4 py-3">
+        ref={cardRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Task detail"
+        tabIndex={-1}
+        className="glass-modal-card relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl"
+      >
+      <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-slate-200 bg-white/95 px-5 py-3 backdrop-blur-md">
         <div className="min-w-0">
           <h2 className="truncate text-sm font-bold text-slate-900">{task ? `${task.key} · ${task.title}` : 'Task detail'}</h2>
-          <div className="mt-0.5 text-[11px] font-medium text-slate-500">Inspector</div>
+          <div className="mt-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">Inspector</div>
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="rounded-full border border-white/70 bg-white/55 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-white/70"
+            className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             onClick={() => alert('Share link (coming soon)')}
           >
             Share
           </button>
-          <button type="button" className="text-sm font-semibold text-slate-600 hover:text-slate-900" onClick={onClose}>
-            ✕
+          <button
+            type="button"
+            aria-label="Close task detail"
+            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+            onClick={onClose}
+          >
+            <span aria-hidden="true">✕</span>
           </button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-5">
         {detailQ.isLoading && <p className="text-sm text-slate-600">Loading…</p>}
         {detailQ.isError && <p className="text-sm text-rose-700">Could not load task.</p>}
         {task && (
@@ -458,7 +526,7 @@ export function TaskDetailPanel({
                       <label className="text-xs font-semibold text-slate-600">Description</label>
                       <Field as="textarea" name="description" rows={3} className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                       <div>
                         <label className="text-xs font-semibold text-slate-600">Priority</label>
                         <Field as="select" name="priority" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm">
@@ -479,20 +547,20 @@ export function TaskDetailPanel({
                           ))}
                         </Field>
                       </div>
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-600">{estLabel}</label>
-                      <Field
-                        name="estimate"
-                        type="number"
-                        step={mode === 'hours' ? '0.5' : '1'}
-                        className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
-                      />
-                      <ErrorMessage name="estimate" component="p" className="text-xs text-rose-600" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-600">Due date</label>
-                      <Field name="dueDate" type="date" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+                      <div>
+                        <label className="text-xs font-semibold text-slate-600">{estLabel}</label>
+                        <Field
+                          name="estimate"
+                          type="number"
+                          step={mode === 'hours' ? '0.5' : '1'}
+                          className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                        />
+                        <ErrorMessage name="estimate" component="p" className="text-xs text-rose-600" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-slate-600">Due date</label>
+                        <Field name="dueDate" type="date" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+                      </div>
                     </div>
                     <div>
                       <label className="text-xs font-semibold text-slate-600">Resolution (when Done)</label>
@@ -606,6 +674,90 @@ export function TaskDetailPanel({
                 )}
             </div>
 
+            <div className="border-t border-slate-200 pt-4">
+              <h3 className="text-xs font-bold uppercase text-slate-600">Related work</h3>
+              <p className="mt-1 text-[11px] text-slate-500">
+                Linked tasks in this project (separate from blocking dependencies in the edit form).
+              </p>
+              {relatedQ.isLoading ? (
+                <p className="mt-2 text-xs text-slate-500">Loading links…</p>
+              ) : relatedQ.isError ? (
+                <p className="mt-2 text-xs text-rose-600">Could not load related tasks.</p>
+              ) : (
+                <ul className="mt-2 space-y-1">
+                  {(relatedQ.data?.related ?? []).length === 0 ? (
+                    <li className="text-xs text-slate-500">No linked tasks yet.</li>
+                  ) : (
+                    (relatedQ.data?.related ?? []).map((r) => (
+                      <li
+                        key={r.id}
+                        className="flex items-start justify-between gap-2 rounded-lg bg-slate-50 px-2 py-1.5 text-xs"
+                      >
+                        <div className="min-w-0">
+                          {projectId && r.boardId ? (
+                            <Link
+                              to={`/app/projects/${projectId}/boards/${r.boardId}?task=${encodeURIComponent(r.id)}`}
+                              className="font-semibold text-indigo-700 hover:text-indigo-900"
+                              onClick={() => onClose()}
+                            >
+                              {r.key}
+                            </Link>
+                          ) : (
+                            <span className="font-semibold text-slate-800">{r.key}</span>
+                          )}
+                          <span className="text-slate-600"> · {r.status}</span>
+                          <div className="truncate text-slate-600">{r.title}</div>
+                        </div>
+                        {canEditRelated && (
+                          <button
+                            type="button"
+                            className="shrink-0 rounded p-0.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                            disabled={removeRelatedTask.isPending}
+                            aria-label={`Remove link to ${r.key}`}
+                            onClick={() => removeRelatedTask.mutate(r.id)}
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </li>
+                    ))
+                  )}
+                </ul>
+              )}
+              {canEditRelated && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <input
+                    type="text"
+                    value={relatedUuid}
+                    onChange={(e) => {
+                      setRelatedUuid(e.target.value);
+                      setRelatedErr(null);
+                    }}
+                    placeholder="Other task UUID (same project)"
+                    className="min-w-[12rem] flex-1 rounded-lg border border-slate-200 px-2 py-1.5 font-mono text-xs"
+                  />
+                  <button
+                    type="button"
+                    disabled={addRelatedTask.isPending || !UUID_RE.test(relatedUuid.trim())}
+                    onClick={() => {
+                      const id = relatedUuid.trim();
+                      addRelatedTask.mutate(id, {
+                        onSuccess: () => {
+                          setRelatedUuid('');
+                          setRelatedErr(null);
+                        },
+                        onError: (e) => setRelatedErr((e as Error).message),
+                      });
+                    }}
+                    className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    Link task
+                  </button>
+                </div>
+              )}
+              {relatedErr && <p className="mt-2 text-xs text-rose-600">{relatedErr}</p>}
+            </div>
+
             {canManage && employeesQ.data && (
               <div className="space-y-2 border-t border-slate-200 pt-4">
                 <h3 className="text-xs font-bold uppercase text-slate-600">Assign</h3>
@@ -682,8 +834,20 @@ export function TaskDetailPanel({
           </div>
         )}
       </div>
+      <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-5 py-3 backdrop-blur-md">
+        <p className="text-[11px] text-slate-500">
+          Esc to close · changes auto-save
+        </p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm"
+        >
+          Close
+        </button>
+      </div>
     </div>
-    </>
+    </div>
   );
 }
 
@@ -691,6 +855,7 @@ type TaskCommentRow = {
   id: string;
   body: string;
   mentions?: string[];
+  mentionDisplay?: { handle: string; userId: string; displayName: string; email: string }[];
   createdAt: string;
   author: { id: string; email: string | null; firstName: string | null; lastName: string | null } | null;
 };
@@ -802,18 +967,35 @@ function TaskCommentsSection({ taskId, boardId }: { taskId: string; boardId: str
         <p className="text-xs text-rose-700">Could not load comments.</p>
       ) : (
         <ul className="max-h-40 space-y-2 overflow-y-auto text-xs">
-          {(commentsQ.data?.comments ?? []).map((c) => (
+          {(commentsQ.data?.comments ?? []).map((c) => {
+            const display: MentionDisplay[] = c.mentionDisplay ?? [];
+            const resolvedHandles = new Set(display.map((d) => d.handle.toLowerCase()));
+            const unresolved = (c.mentions ?? []).filter((m) => !resolvedHandles.has(m.toLowerCase()));
+            return (
             <li key={c.id} className="rounded-lg bg-slate-50 px-2 py-1.5">
               <div className="font-semibold text-slate-800">
                 {c.author
                   ? `${c.author.firstName ?? ''} ${c.author.lastName ?? ''}`.trim() || c.author.email || 'User'
                   : 'User'}
               </div>
-              <p className="mt-0.5 whitespace-pre-wrap text-slate-700">{c.body}</p>
-              {c.mentions && c.mentions.length > 0 && (
+              <p className="mt-0.5 whitespace-pre-wrap text-slate-700">{formatCommentBody(c.body, display)}</p>
+              {(display.length > 0 || unresolved.length > 0) && (
                 <div className="mt-1 flex flex-wrap gap-1">
-                  {c.mentions.map((m) => (
-                    <span key={m} className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-900">
+                  {display.map((m) => (
+                    <span
+                      key={`d-${m.handle}`}
+                      title={m.email}
+                      className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-900"
+                    >
+                      @{m.displayName}
+                    </span>
+                  ))}
+                  {unresolved.map((m) => (
+                    <span
+                      key={`u-${m}`}
+                      title="Not a workspace member"
+                      className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-700"
+                    >
                       @{m}
                     </span>
                   ))}
@@ -821,7 +1003,8 @@ function TaskCommentsSection({ taskId, boardId }: { taskId: string; boardId: str
               )}
               <div className="text-[10px] text-slate-400">{new Date(c.createdAt).toLocaleString()}</div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
       <textarea

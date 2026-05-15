@@ -1,0 +1,4 @@
+Task,Status,Priority,Owner,Due Date,Tags
+Define product requirements,To Do,High,,2026-06-01,analysis;scope
+Setup repositories,In Progress,Medium,,2026-06-10,setup
+Smoke-test build pipeline,To Do,Low,,2026-06-15,infra

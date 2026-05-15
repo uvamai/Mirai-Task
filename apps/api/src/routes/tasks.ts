@@ -51,7 +51,7 @@ import { estimateUnitLabel, resolveEstimateMode, validateEstimateValue } from '.
 import { assertValidParentTask } from '../services/taskParentage';
 import { extractMentionsFromBody } from '../services/commentMentions';
 import { createUserNotification } from '../services/notificationService';
-import { resolveMentionHandlesToUserIds } from '../services/mentionUsers';
+import { resolveMentionDisplay, resolveMentionHandlesToUserIds } from '../services/mentionUsers';
 import { mentionsEnabled, quietHoursBlock } from '../services/notificationPrefs';
 import Joi from 'joi';
 import { TaskRelation } from '../models';
@@ -389,10 +389,17 @@ tasksRouter.get('/tasks/:taskId/related', authenticateJwt, loadMembership, async
     throw e;
   }
   const rels = await TaskRelation.findAll({
-    where: { tenantId: req.tenantId!, projectId: task.projectId, type: 'related', fromTaskId: task.id },
+    where: {
+      tenantId: req.tenantId!,
+      projectId: task.projectId,
+      type: 'related',
+      [Op.or]: [{ fromTaskId: task.id }, { toTaskId: task.id }],
+    },
     order: [['createdAt', 'DESC']],
   });
-  const ids = rels.map((r) => r.toTaskId);
+  const ids = Array.from(
+    new Set(rels.map((r) => (r.fromTaskId === task.id ? r.toTaskId : r.fromTaskId)))
+  );
   const rows = ids.length
     ? await Task.findAll({
         where: { tenantId: req.tenantId!, projectId: task.projectId, id: { [Op.in]: ids } },
@@ -448,7 +455,10 @@ tasksRouter.post('/tasks/:taskId/related', authenticateJwt, loadMembership, requ
 });
 
 tasksRouter.delete('/tasks/:taskId/related/:toTaskId', authenticateJwt, loadMembership, requireRole('ADMIN', 'MANAGER', 'EMPLOYEE'), async (req, res) => {
-  const delSchema = Joi.object({ toTaskId: Joi.string().uuid().required() });
+  const delSchema = Joi.object({
+    taskId: Joi.string().uuid().required(),
+    toTaskId: Joi.string().uuid().required(),
+  });
   const { error } = delSchema.validate(req.params, { abortEarly: false });
   if (error) {
     res.status(400).json({ error: 'Validation failed', details: error.details });
@@ -970,21 +980,38 @@ tasksRouter.get('/tasks/:taskId/comments', authenticateJwt, loadMembership, asyn
     order: [['createdAt', 'ASC']],
     include: [{ model: User, as: 'AuthorUser', attributes: ['id', 'email', 'firstName', 'lastName'] }],
   });
+  /**
+   * P10 — Batch-resolve every unique mention handle across this task's comments
+   * in a single tenant-scoped query, then attach a `mentionDisplay[]` per row so
+   * the web app can render `@handle` tokens with real display names.
+   */
+  const allHandles = new Set<string>();
+  for (const c of rows) {
+    for (const h of c.mentions ?? []) allHandles.add(h.toLowerCase());
+  }
+  const display = await resolveMentionDisplay(req.tenantId!, Array.from(allHandles));
   res.json({
-    comments: rows.map((c) => ({
-      id: c.id,
-      body: c.body,
-      mentions: c.mentions ?? [],
-      createdAt: c.createdAt,
-      author: c.AuthorUser
-        ? {
-            id: c.AuthorUser.id,
-            email: c.AuthorUser.email,
-            firstName: c.AuthorUser.firstName,
-            lastName: c.AuthorUser.lastName,
-          }
-        : null,
-    })),
+    comments: rows.map((c) => {
+      const handles = c.mentions ?? [];
+      const mentionDisplay = handles
+        .map((h) => display.get(h.toLowerCase()))
+        .filter((x): x is NonNullable<typeof x> => Boolean(x));
+      return {
+        id: c.id,
+        body: c.body,
+        mentions: handles,
+        mentionDisplay,
+        createdAt: c.createdAt,
+        author: c.AuthorUser
+          ? {
+              id: c.AuthorUser.id,
+              email: c.AuthorUser.email,
+              firstName: c.AuthorUser.firstName,
+              lastName: c.AuthorUser.lastName,
+            }
+          : null,
+      };
+    }),
   });
 });
 

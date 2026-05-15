@@ -1,8 +1,77 @@
 # Roadmap item specifications
 
-This file is merged into **task descriptions** on Roadmap boards by `scripts/seed-roadmap-tasks.mjs` (see `## Item specifications` below). Keep **###** headings aligned with the **ID** column in [ROADMAP-TODOS.md](ROADMAP-TODOS.md) (T*, P*, A*, **M*** on Product improvement).
+This file is merged into **task descriptions** on Roadmap boards by `scripts/seed-roadmap-tasks.mjs` (see `## Item specifications` below). Keep **###** headings aligned with the **ID** column in [ROADMAP-TODOS.md](ROADMAP-TODOS.md) (T*, P*, A*, **M*** on Product improvement, **PM*** on Roadmap PM through **PM22**).
 
 **Status labels** on cards follow the table: **Done** → column **Done**; **Open** / **Not started** → **Backlog** by default.
+
+---
+
+## ClickUp University: feature map and master implementation plan
+
+**Official reference (paths, courses, webinars):** [ClickUp University](https://university.clickup.com/)
+
+University content clusters **hierarchy & navigation**, **views** (List/Board/Calendar/Gantt/Table, filters, favorites), **custom statuses and workflows**, **ClickApps** (space-level modules), **custom fields** (including AI-assisted fields), **automations**, **dashboards**, **Docs/Wiki**, **Forms**, **Chat** (DMs, channels, location-based threads), **ClickUp Brain / AI** (knowledge, writer, project assist, agents), **time tracking & timesheets/approvals**, **Sprints/agile**, **capacity planning**, **whiteboards**, **templates**, **Home/Inbox/Planner**, **guests & admin**. This map informs MIRAI sequencing; it is **not** a commitment to clone ClickUp.
+
+### Updating the todo list after each stage
+
+When a **stage** below is code-complete and reviewed: (1) set the matching row(s) in [ROADMAP-TODOS.md](ROADMAP-TODOS.md) **Status** and refresh **Notes / next action** (one-line ship log + “Next: …”); (2) under the relevant `### PM*` section in this file, add an **Implemented (YYYY-MM-DD):** bullet list; (3) run `npm run seed:roadmap` so Roadmap PM tasks stay in sync.
+
+### Feature taxonomy (University topics to MIRAI IDs)
+
+| CU cluster | Example University themes | MIRAI IDs | Mirai baseline / intent |
+|------------|----------------------------|-----------|-------------------------|
+| Shell & navigation | Hierarchy best practices; CU interface; sidebar/toolbar | PM1, PM2, PM8, M7, M8 | Tenant/project/board; palette + board switcher shipped |
+| Views & persistence | “Navigating with Views”; filters, favorites, search | PM2, PM3, PM9, M10 | M10 = saved filters v1; PM2 extends per-view state |
+| Fields & data shape | Custom fields overview; field manager; AI fields (later) | PM3, PM17, T5, T10 | PM3 = show/hide; PM17 = definitions, types, governance |
+| Task operations | Create task; relationships; cross-functional / linked work | PM4, PM5, T11, PM9 | My Work exists; multi-list metaphor = future |
+| Collaboration | Comments; Chat learning paths; Inbox/Home | PM6, PM16, PM20, T12, P10 | Comments + mentions; Chat net-new |
+| Knowledge | Docs & Wiki; Brain search | PM13, PM21 | No first-class wiki yet |
+| Forms & intake | Forms simplify data collection | PM14, T17 | Public intake API + page exist; visual builder = PM14 |
+| Automation & modules | Automate workflow; ClickApps for work styles | PM11, PM19, T4, P9 | Recurring per board; cross-board P9 open |
+| Time & capacity | Time tracking path; timesheets; capacity planning | PM12, PM18, PM22 | Not started (product decision: native vs integration) |
+| Planning | Planner; Calendar; Home | PM20, PM2 | Calendar route stub in +View modal |
+| Reporting | Dashboards / TIML-style reporting | PM15 | Reports routes partial from project header |
+| Agile | Software teams path; sprint planning series | PM18 | Optional lite sprints after PM9 |
+| Visual collaboration | Whiteboards courses / Feature Fest | PM10 | Spike only until Stage F gate |
+| AI | Brain; Agents; Super Agents paths | PM21, A1–A15 | Automation pipeline separate board; gating M* |
+| Admin & identity | Admin cert prep; Guests | P14, T1–T2, roles | SAML P14 open |
+
+### Master delivery stages (execution order)
+
+Each stage lists **engineering outcomes**. Dependency: complete earlier stages before expanding surface area (especially PM16/PM13/PM21).
+
+**Stage A — Stabilize core PM path (parallel OK)**  
+Board list virtualization (**T16b**), notification delivery groundwork (**P1** where needed for parity stories), merge **M10** semantics into the PM2 view-state design doc before coding persistence. **Gate:** primary board/list flows pass smoke + typecheck; no open P0 UX regressions on M7/M8.
+
+**Stage B — PM2 view persistence + PM8 hub links**  
+Schema for per-user or per-board `viewPresets` (JSON versioned); restore last active view; “Customize view” drawer; onboarding hub (**PM8**) links import (**T17**), invites, first-board CTA. **Gate:** reload preserves view + visible columns for List and Board.
+
+**Stage C — PM3 Fields + PM4 task menu**  
+Column/card field visibility (`FieldsPanel` + PM2 chips); context menu (copy / duplicate / deep link / move column via **Wave A–B**). **Gate:** common task ops doable without opening inspector.
+
+**Stage D — PM5 scheduling + PM6 activity**  
+Start/due, dependencies UI wired to existing relation APIs; activity stream + composer (mention parity **P10**). **Gate:** comment and activity both usable for standup-style review.
+
+**Stage E — PM7 templates center + PM8 completion**  
+Browse Mirai + org templates; apply-to-project; polish empty states. **Gate:** template-driven project start documented for CS.
+
+**Stage F — PM9 Gantt/Table**  
+Shared column model with PM3; performance budget with **T16b**. **Gate:** two new view types read/write tasks through same API contracts.
+
+**Stage G — PM11 integrations + PM19 ClickApps-style modules**  
+Webhooks hardening, inbound signals, admin toggles for optional modules (safe defaults). **Gate:** no orphan premium nav; server enforces eligibility.
+
+**Stage H — Depth backlog (spike → MVP each; order by GTM)**  
+Pick one stream at a time unless staffed: **H1 PM12** time, **H2 PM13** docs, **H3 PM14** forms builder, **H4 PM15** dashboards, **H5 PM16** chat *or* bridge, **H6 PM17** custom fields platform, **H7 PM18** sprints, **H8 PM20** home/planner, **H9 PM21** AI UX on **A\***, **H10 PM22** goals/portfolio. **Gate (each):** ADR + security review + roadmap row moved to **Done** with verification bullets.
+
+### Risks (short)
+
+| Risk | Mitigation |
+|------|------------|
+| Scope creep on Chat/Docs/AI | Keep PM16/PM13/PM21 **Not started** until Stage F; prefer ship **bridge** or **embed** options |
+| JSON view settings compatibility | Version key on `board.settings.viewPresets` / user prefs; migration helper |
+| Cross-project leaks in dashboards | Tenant-scoped aggregates only; explicit project picker per widget |
+| AI trust & compliance | PM21 follows M4/M5 and tenant data residency policy |
 
 ---
 
@@ -168,6 +237,44 @@ This file is merged into **task descriptions** on Roadmap boards by `scripts/see
 
 ---
 
+### T17
+
+**Requirement:** Project managers (and Admins) can create a new board by uploading an Excel/CSV file and mapping spreadsheet columns to task fields (title, status, priority, assignee, due date, tags, custom fields). The feature must work on every subscription plan, respect per-project board caps, and stay rate-limited per tenant.
+
+**Why:** Onboarding from existing trackers / spreadsheets is the #1 friction for new tenants. Solving it once unlocks every plan tier and converts pure "evaluation" sessions into long-lived boards.
+
+**Constraints:**
+- Manager/Admin only; multipart upload ≤ 5 MB; row caps per plan (200/5,000/50,000/∞).
+- Imported boards count toward each plan's `maxBoardsPerProject` cap (Starter=3, Standard=10, Pro=25, Enterprise=∞).
+- Per-tenant import rate limits (2/10/30/∞ imports/hour).
+- Title is the only required mapping; everything else is optional with sensible defaults.
+- All inputs validated by Joi; same `assertProjectMemberAccess` gate as `/projects/:id/boards`.
+
+**Dependencies:** existing `Board`/`Task` models, `assertCanCreateBoard`, `customFields`, `socket.emitBoardTasksUpdated`, `invitationService` (for the bulk follow-through).
+
+**Acceptance criteria:**
+
+- `POST /projects/:id/imports/excel/preview` returns a non-persisted snapshot: sheets, headers, sample rows, distinct status/priority/owner values, suggested mapping.
+- `POST /projects/:id/imports/excel/commit` creates the board in a single transaction, inserts all rows as tasks, snaps each row's status onto the derived/explicit Kanban stages, and records `board.import.excel` in `ActivityLog`.
+- `DELETE /projects/:id/imports/excel/:uploadId` cancels a preview before commit.
+- `POST /projects/:id/boards/:boardId/undo-import` deletes a freshly-imported board (and its tasks) within 5 minutes.
+- `POST /projects/:id/members/bulk` accepts both `userId` (existing tenant member → ProjectMember) and `email` (creates `TenantInvitation` if user is unknown).
+- Frontend wizard at `ImportExcelModal` (upload → map → confirm → done) is reachable from the project header toolbar and the empty-board state.
+- Pricing matrix, landing page, README, and feature matrix advertise the feature with row-cap and rate-cap badges per tier.
+
+**Implementation plan (delivered):**
+
+1. **P0 — Foundation:** `xlsx` dep in `apps/api`; service skeleton at `apps/api/src/services/excelImport.ts`; synthetic `excel_import` template registered in `boardTemplatesCatalog.ts`.
+2. **P1 — Backend MVP:** pure-function parser + mapping (priority/date/owner normalizers, custom-field targets), `preview`/`commit`/`cancel`/`undo-import` routes, row-cap + rate-limit, Joi validators in `apps/api/src/validation/imports.ts`, 18 unit tests + integration test.
+3. **P2 — Frontend wizard:** `apps/web/src/pages/ImportExcelModal.tsx` (upload/map/confirm/done) with header-driven mapping selects, "derive Kanban stages from Status" toggle, downloadable project-aware template; wired into `ProjectLayout` toolbar and `ProjectBoardIndex` empty state.
+4. **P3 — PM follow-through:** `POST /projects/:id/members/bulk` (existing tenant users + email invitations); imported board renders an `ImportBanner` listing unresolved owner references with one-click bulk add/invite.
+5. **P4 — GTM / docs:** `pricingMatrix.ts` (all four plans), `LandingPage.tsx`, `PricingPage.tsx` (explicit row/rate-cap comparison strip), README, `docs/feature-matrix.md`, `docs/ROADMAP-TODOS.md` (this entry). **Call-out:** the `standard` plan is referenced in `pricingMatrix.ts` but is not yet seeded in `subscription_plans` (initial-schema migration only seeded `starter`/`pro`/`enterprise`). Backfilling it is intentionally deferred to a separate PR; today no tenant maps to `standard` so the row-cap fallback to "pro" caps is dead code.
+6. **P5 — Power-user (delivered as part of T17 follow-up, see T17e):** mapping presets persisted on `tenant.settings.importPresets` keyed by header signature; idempotent re-upload guard via `metadata.importedFrom.fileHash` (24h window); outbound `board.imported` webhook; async worker path for files > 2000 rows via `import_jobs` table using `FOR UPDATE SKIP LOCKED`.
+
+**Related:** T14 (templates), P12 (rate limits), M4 (plan eligibility).
+
+---
+
 ### T16b
 
 **Requirement:** Kanban columns must scale to large card counts without DOM blow-up, while preserving **dnd-kit** (or equivalent) drag-and-drop semantics and accessibility.
@@ -260,6 +367,13 @@ This file is merged into **task descriptions** on Roadmap boards by `scripts/see
 2. Seed helpers for invite + accept (mail catcher or API shortcut).
 3. Implement flows; parallel-safe data (unique emails).
 4. Document env in `CONTRIBUTING.md` / Ops.
+
+**Implemented (2026-05-12):**
+
+- New specs: `apps/web/e2e/invitations.spec.ts`, `template-project.spec.ts`, `board-dnd.spec.ts` — each gated by its own opt-in env (`E2E_INVITES`, `E2E_TEMPLATE_PROJECT`, `E2E_BOARD_DND`) on top of `E2E_EMAIL` / `E2E_PASSWORD`, so CI runs that don't want side effects can skip.
+- Added `data-testid` hooks on the invite form (`invite-email`, `invite-role`, `invite-submit`, `invitation-row`), the project create form (`project-name`, `project-template`, `project-seed-samples`, `create-project-submit`, `project-link`), and the board (`board-column`, `board-card`, `board-card-drag-handle`).
+- DnD spec drives dnd-kit via `page.mouse.*` stepping past the 6px PointerSensor activation distance — no third-party plugin required.
+- Fixed the pre-existing pricing smoke heading regression (`Per-tenant` → `Subscription plans`) so the `smoke` suite is green again.
 5. Optional CI job when secrets available.
 
 **Related:** T13, T16b.
@@ -354,6 +468,12 @@ This file is merged into **task descriptions** on Roadmap boards by `scripts/see
 3. Notification deep links preserve mapping.
 4. Tests for collision + rename latency.
 
+**Implemented (2026-05-12):**
+
+- API: new `resolveMentionDisplay(tenantId, handles[])` in `apps/api/src/services/mentionUsers.ts` returns `Map<handle, { handle, userId, displayName, email }>` via a single tenant-scoped `User.findAll`. `GET /tasks/:taskId/comments` now batches every unique handle across the result set into one resolve call and attaches `mentionDisplay[]` to each row (alongside the raw `mentions[]` for back-compat).
+- Web: `apps/web/src/features/tasks/formatMentions.tsx` exposes `formatCommentBody(body, mentions)` which tokenises `@(handle)` against the resolved set and renders styled `@DisplayName` chips inline; unknown handles fall through to plain `@handle` so we never silently lose info when a member leaves.
+- `TaskCommentsSection` now uses the new util for both the inline body and the pill row; non-member handles are surfaced in a separate slate-tone pill so authors notice typos.
+
 **Related:** T12, P2.
 
 ---
@@ -396,6 +516,22 @@ This file is merged into **task descriptions** on Roadmap boards by `scripts/see
 2. Implement limiter service; wire middleware.
 3. Tests for threshold behavior.
 4. Runbook + env knobs.
+
+**Implemented (2026-05-12, v1 — in-memory):**
+
+- `apps/api/src/services/planLimits.ts` now exposes three helpers backed by a single `rateBuckets: Map<string, number[]>` (sliding window, minute or hour):
+  - `assertTenantRateLimit({ tenantId, key, cap, window?, label? })` — throws `TenantRateLimitError` (HTTP 429 + `Retry-After`) when the per-tenant cap is exceeded for a given `key`.
+  - `tryTenantRateLimit(...)` / `tryUserRateLimit(...)` — soft variants returning `false` instead of throwing; used for fanout (drop + log).
+  - `_resetRateLimits()` for tests.
+- Surfaces wired up:
+  - `PATCH /tenant/settings` (when `customBoardTemplates` or `tagCatalog` is mutated) — 30/hour/tenant (`tenant_settings_write`).
+  - `POST /invitations` — 60/hour/tenant (`invitation_create`) layered on top of the existing IP-based `inviteCreateLimiter`.
+  - `POST /projects/:id/members/bulk` — 20/hour/tenant (`members_bulk`).
+  - `fireProjectWebhooks` — 120/minute/tenant soft cap (`webhook_fanout`); dropped deliveries are logged and recorded in the project's `webhookDeliveryLog` with `ok:false, httpStatus:0` for observability.
+  - `createUserNotification` — 2000/minute/tenant + 500/hour/user soft caps (`notifications_create`); drops with `logger.warn`.
+- 429 responses include `code: "LIMIT_RATE_<KEY>"`, `retryAfterSeconds`, and a `Retry-After` HTTP header.
+- Unit tests in `apps/api/src/services/planLimits.test.ts` cover per-tenant isolation, per-key isolation, reset, hard vs soft variants, and the sliding-window lookback.
+- **Known limit:** single-process / single-node. For multi-instance API deployments, migrate `rateBuckets` to Redis (`INCR` + `EXPIRE` per `t:<tenantId>:<key>:<windowBucket>`) before turning these caps down meaningfully.
 
 **Related:** P1, P9.
 
@@ -741,3 +877,289 @@ This file is merged into **task descriptions** on Roadmap boards by `scripts/see
 **Related:** M1, M2, A13.
 
 ---
+
+### M7
+
+**Requirement:** Global Cmd/Ctrl+K command palette that lets the user jump to any project or board without leaving the keyboard.
+
+**Why:** Tasker-style apps live or die by the fast-path navigation. Pre-this work the palette existed but lacked focus trap, arrow-key navigation, and recent-history; users had to type to find the row they wanted even when they were jumping between two boards.
+
+**Constraints:** No API changes; works on macOS (⌘+K) and Windows/Linux (Ctrl+K); must not conflict with text-input shortcuts.
+
+**Implemented (2026-05-12):**
+
+- Global keybinding (`useEffect` in `AppShell.tsx`) opens the palette with `Ctrl/Cmd+K` from anywhere in the authenticated app.
+- `apps/web/src/hooks/useRecentNavigation.ts` (last 8, FIFO, localStorage-backed) records each board visit. `ProjectLayout` pushes the current board into the cache on mount so the palette is useful immediately.
+- `CommandPalette` rewrite:
+  - `useFocusTrap` so Tab is contained inside the modal.
+  - `↑/↓/Home/End` cursor moves the highlighted row; `Enter` opens; `Esc` closes.
+  - Grouped sections (Recent · Projects · Boards) with sticky group headers when the query is empty.
+  - Active row uses the indigo brand colour + reverse-style hint pill.
+  - Footer key-hint legend so the shortcuts are discoverable.
+- Recents survive a hard reload (localStorage) but are scoped per browser; storage-event listener keeps multiple open tabs in sync.
+
+**Related:** M8, P8.
+
+---
+
+### M8
+
+**Requirement:** Switch boards inside the project header without leaving the current view, replacing the native `<select>` that triggered a full page reload.
+
+**Why:** Going through a hard navigation lost client-side state (filters, scroll position, draft comments) and broke optimistic updates.
+
+**Implemented (2026-05-12):**
+
+- `apps/web/src/components/project/BoardSwitcher.tsx` is a custom listbox dropdown:
+  - Uses `useNavigate` for soft React-Router navigation; component state and query cache survive the swap.
+  - `useFocusTrap` while the menu is open.
+  - Keyboard: `↑/↓/Home/End` move cursor, `Enter`/`Space` select, `Esc` closes and returns focus to the trigger button.
+  - Marks the currently active board with an emerald "Active" badge.
+  - Includes an inline **"+ New board…"** action for Admins / Managers that wires to the existing `CreateBoardModal`.
+  - Each navigation also pushes the visited board into the Cmd/Ctrl+K recent-navigation cache, so the palette becomes richer the more the user hops.
+- `ProjectLayout` no longer has the legacy native `<select>` + duplicate active-name span; layout is denser.
+
+**Related:** M7, P8.
+
+---
+
+### PM1
+
+**Reference:** [ClickUp University: feature map and master implementation plan](#clickup-university-feature-map-and-master-implementation-plan) (topic taxonomy, stages A–H, stage-gate checklist).
+
+**Outcome:** A single north-star document for “MIRAI as PM tool” parity (ClickUp-class project shell), aligned to the Starlink / internal benchmark capture: workspace chrome, project header, views rail, fields, task menus, activity, templates, and onboarding surfaces — with an explicit **MVP boundary** so engineering ships in waves.
+
+**Phased execution order (suggested):**
+
+1. **Phase 1 — Shell + early views UX:** breadcrumb workspace/project, favorite, project ••• actions, **All apps** launcher (`AppLauncherModal`), **+ View** entry with real navigators for List/Board/Calendar and honest “coming soon” for Gantt/Table/Timeline/Docs/Forms; reuse M7/M8 navigation patterns.
+2. **Phase 2 — Views persistence:** per-user or per-board saved view configuration (columns, filters, grouping) shared by List/Board where applicable; foundation for PM9.
+3. **Phase 3 — Fields (PM3)** then **task context menu (PM4)** in parallel where possible.
+4. **Phase 4 — Task detail scheduling + relationships rail (PM5)**; **activity rail (PM6)**.
+5. **Phase 5 — Templates lite (PM7), onboarding hub (PM8)**.
+6. **Phase 6 — Gantt/Table (PM9)**; **integrations depth (PM11)** with P1/M*; **whiteboards (PM10)** only after spike.
+
+**Verification:** This section + rows PM1–PM11 in `ROADMAP-TODOS.md` stay the checklist; PM2 notes carry dated ship log for incremental delivery.
+
+**Related:** M7, M8, M10, PM2–PM11, P1.
+
+---
+
+### PM2
+
+**Outcome:** Users discover and add project views from a consistent entry point; primary views route correctly; secondary views are visibly queued.
+
+**Implemented (2026-05-14):**
+
+- `AppLauncherModal`, `AddProjectViewModal`, `ProjectHeader` — apps launcher, +View gallery, breadcrumb / favorite / project actions (Phase 1a shell).
+- `apps/web/src/hooks/useBoardShellView.ts` — local map `mirai.boardShellViewByBoardId`; `getBoardShellView` / `setBoardShellView`; `boardShellAppPath` / `boardShellRelativePath`; `shellViewFromPathname`; `parseBoardIdFromProjectPath` for robust board id from URL (List/Calendar child routes).
+- `apps/web/src/components/project/CustomizeBoardEntryModal.tsx` — “Default board entry” (Board / List / Calendar); focus trap + Esc.
+- `ProjectTabs` — **Customize** opens modal when a board is active.
+- `ProjectLayout` — syncs shell view from pathname; recent-nav `to` uses `boardShellAppPath`; **route board id** from pathname (replaces strict `useMatch` so multi-board List/Calendar show correct tabs/switcher).
+- `apps/web/src/hooks/useViewColumnPrefs.ts` — `mirai.viewColumnPrefs.v1` map keyed by board id; list + board boolean maps; `applySavedViewColumnSnapshot`; labels + `listGridTemplate` / `visibleListColumnKeys` / `prefsDifferFromDefaults`.
+- `TaskListPage` — shared toolbar + `matchesFilters` pipeline; dynamic grid/table from `visibleListColumnKeys` + `listGridTemplate`; virtualized rows use same template.
+
+**Next:** Calendar shell column JSON; optional server sync for `viewColumnPrefs`; merge “Customize board entry” with field strip.
+
+**Related:** M10, PM1, PM3, PM9.
+
+---
+
+### PM3
+
+**Outcome:** A ClickUp-style **Fields** control: show/hide list columns and board card fields without leaving the view; respects role capabilities and board `kanbanStages`.
+
+**Constraints:** No breaking API for existing boards; start read-only toggles client-side if needed, then promote to board settings when stable.
+
+**Implemented (2026-05-14):** `FieldsPanel` — right-edge drawer from **Fields** in `BoardToolbar` (board + list shells); two sections (list columns, board card fields) with short hints; status column hint lists current `workflowStages` from the board; checkboxes mirror `useViewColumnPrefs` toggles (still at least one column + one card field); **Reset all to defaults** calls `resetDefaults()` on the hook. `createDefaultViewColumnPrefs()` ensures a fresh object on reset. Toolbar chip rows (PM2) remain for quick edits.
+
+**Later:** WIP hints per column; persist prefs to board settings API; custom-field-driven columns (PM17).
+
+**Related:** T5, T10, PM2.
+
+---
+
+### PM4
+
+**Outcome:** Task row/card **•••** (and keyboard) exposes: copy link, copy public id, duplicate, move to column/board (where API exists), open dependencies — shipped in waves A→D to limit risk.
+
+**Wave A (shipped 2026-05-14):** `apps/web/src/features/tasks/TaskCardContextMenu.tsx` — board cards (`BoardPage` / `SortableTaskCard`) and list rows (`TaskListPage`, including virtualized grid). Actions: Open (sets `?task=<uuid>`), Copy link (absolute URL with current pathname + `task`), Copy task key, Copy task ID; **Duplicate** for Admin/Manager via `POST /boards/:boardId/tasks` with copied title/description/priority/status/tags/estimate/dueDate (fresh metadata; no parent). `BoardPage` and `TaskListPage` derive `TaskDetailPanel` task id from `useSearchParams` so shared links open the inspector.
+
+**Wave B (shipped 2026-05-14):** **Open in new tab** (same deep link); **Move to** — scrollable submenu of workflow columns; calls existing `PATCH /tasks/:id` with `{ status }` (same contract as drag on board). Wired on kanban cards and list rows; errors surface via existing task `PATCH` mutation toasts on `BoardPage` / `TaskListPage`.
+
+**Wave C (shipped 2026-05-14):** When the card/list **⋮** menu opens, **`GET /tasks/:taskId/related`** loads **TaskRelation** peers. Each row: primary click opens the task (same board → `onOpen` / `?task=`; other board → `navigate` with `boardShellAppPath` + `?task=`); **↗** opens that deep link in a new tab. **Blocking dependencies:** if `task.dependencies` is non-empty, **Copy dependency IDs** copies UUID list (blocking graph still edited in inspector). Exported helper **`relatedTaskHref(projectId, boardId, taskId)`** for deep links to another board’s task.
+
+**Related:** P10, PM5.
+
+---
+
+### PM5
+
+**Outcome:** Task detail surfaces start/due, simple dependency/blocker visualization, and deep-links consistent with PM4.
+
+**Implemented (2026-05-14):** **Related work** in `TaskDetailPanel` — loads `GET /tasks/:taskId/related`; lists key, status, title; opens linked task via `/app/projects/:projectId/boards/:boardId?task=` (closes modal). **Link task** (UUID) + remove use `POST /tasks/:taskId/related` and `DELETE …/related/:toTaskId` (same rules as API: Admin/Manager, or Employee on assigned user task). Blocking dependencies remain the existing `dependencies` PATCH field on the edit form.
+
+**Related:** PM4, existing `TaskRelation` / graph services if present.
+
+---
+
+### PM6
+
+**Outcome:** Dedicated activity stream with composer parity to comments (@mentions, attachments policy TBD); layout option: rail vs modal per design tokens.
+
+**Related:** P10, M9.
+
+---
+
+### PM7
+
+**Outcome:** In-app **Templates** entry: Mirai catalog + org-saved templates; “Apply to project” uses existing template/board flows (T14, board templates).
+
+**Implemented (lite 2026-05-14):** `ProjectTemplatesPage` at `/app/projects/:projectId/templates` — lists `GET /board-templates`; links to workspace `/app` to create a project with a template key.
+
+**Related:** T3, T14.
+
+---
+
+### PM8
+
+**Outcome:** Central **Get data in** / onboarding hub linking import (T17), invites, and first-board guidance; linked from launcher and org settings.
+
+**Implemented (lite 2026-05-14):** `ProjectGettingStartedPage` at `/app/projects/:projectId/getting-started`; **Get data in** `NavLink` in `ProjectTabs`. T17 import still opened from board toolbar.
+
+**Related:** T17, PM1.
+
+---
+
+### PM9
+
+**Outcome:** **Gantt** and **Table** as first-class views once PM2 persistence exists; share column metadata with PM3.
+
+**Implemented (table lite 2026-05-14):** Route `boards/:boardId/table` renders `TaskListPage` with forced HTML table (no virtualizer); project tabs + **+ View** modal entry. **Gantt:** still planned — timeline engine + T16b.
+
+**Related:** PM2, PM3, T16b (board performance).
+
+---
+
+### PM10
+
+**Outcome:** Decision record + optional spike for whiteboards / canvas; product may defer or partner/embed.
+
+**Related:** PM1.
+
+---
+
+### PM11
+
+**Outcome:** Deeper integrations (webhooks, inbound email, third-party connectors) and automation UX aligned with tenant plan and M4/M5 enforcement.
+
+**Related:** P1, M1–M5, A-series.
+
+---
+
+### PM12
+
+**Outcome:** Native or integrated **time tracking**: log time on tasks, timesheet review, optional approval chain, exports — aligned to University “Efficient time tracking” paths.
+
+**Implementation plan:** (0) Product pick: first-party vs integration (Harvest/Toggl/Jira worklog). (1) Data model: `time_entries` (tenantId, userId, taskId, minutes, note, startedAt) + RLS by membership. (2) API: CRUD + list by task + period; manager approve if enabled in tenant settings. (3) Web: inline timer + manual entry on TaskDetail; summary row on board cards optional. (4) Billing: plan matrix row for caps.
+
+**Related:** PM5, P1.
+
+---
+
+### PM13
+
+**Outcome:** **Collaborative Docs / Wiki** (structured pages, permissions, @mentions, embed tasks, discoverable search) per University Docs + Wiki courses.
+
+**Implementation plan:** (1) Doc entity (project-scoped or tenant-scoped) with revision history. (2) Realtime or lock-based edit MVP. (3) Link from project header / launcher; search index (future tie to PM21). (4) Convert selection → task (later).
+
+**Related:** PM8, PM21.
+
+---
+
+### PM14
+
+**Outcome:** **Forms builder** (drag fields, validation, branding), routing rules, response storage — beyond today’s **public intake** (`intakePublic` + `PublicIntakePage`) which is a thin fixed-field flow.
+
+**Implementation plan:** (1) Inventory current intake settings on `Project`. (2) Form definition JSON + publish URL per form. (3) Admin builder UI; map answers to task custom fields / description. (4) Spam/abuse: rate limits (reuse P12 patterns), captcha.
+
+**Related:** T17 (import is sibling “get data in” lane), PM8.
+
+---
+
+### PM15
+
+**Outcome:** **Dashboards**: configurable widgets (tasks by status, burn slice, assignee load) scoped to selected projects/boards — University dashboards / reporting themes.
+
+**Implementation plan:** (1) `dashboard` entity per user or shared link. (2) Widget types v1: task counts, recent activity, SLA at risk. (3) Query batching to avoid N+1; cache TTL. (4) Role checks on each widget’s project scope.
+
+**Related:** PM9, T6, T7.
+
+---
+
+### PM16
+
+**Outcome:** **Team Chat** (channels, DMs, threads, optional “location-based” context links) per University Chat paths — largest greenfield; consider **bridge** (Slack/Teams) before full native.
+
+**Implementation plan:** (0) ADR: native vs bridge vs defer. (1) If native: message store, presence, notifications (P1), search. (2) Deep link to tasks/boards. (3) Mobile-friendly layout pass.
+
+**Related:** PM6, P1, T9.
+
+---
+
+### PM17
+
+**Outcome:** **Custom fields platform**: define field types per project/board, required rules, optional “field manager” admin UX — beyond **PM3** visibility (University custom fields + manager courses).
+
+**Implementation plan:** (1) Extend existing `customFields` / `validateTaskMetadata` patterns in API. (2) UI for create/rename/archive fields. (3) Rollups/formulas later phase.
+
+**Related:** PM3, T14.
+
+---
+
+### PM18
+
+**Outcome:** **Sprints / agile**: sprint container, dates, commitment set, burndown-lite, integration with List/Board filters — University software-teams + sprint planning series.
+
+**Implementation plan:** (1) Sprint metadata on board or parallel entity. (2) Filter tasks by sprintId; board template “Sprint board”. (3) Optional velocity chart when history exists.
+
+**Related:** PM9, PM2.
+
+---
+
+### PM19
+
+**Outcome:** **ClickApps-style modules**: tenant-level toggles enabling optional behaviors (time tracking, sprints, automations) without shipping dead UI — “Enable and optimize Space ClickApps” analogue.
+
+**Implementation plan:** (1) `tenant.settings.modules` or feature flags table. (2) Server enforcement: reject API if module off. (3) Admin settings UI grouped by module.
+
+**Related:** M1–M5, PM11.
+
+---
+
+### PM20
+
+**Outcome:** **Home / Inbox / Planner** hub: cross-project “what’s on me”, snooze, weekly plan surface — University Home, Planner, “My Tasks” paths (MIRAI: augment **T11** My work + **M7** navigation).
+
+**Implementation plan:** (1) IA pass: single `/home` or enhance existing landing. (2) Planner = calendar + drag blocks (optional). (3) Notification triage inbox (ties T9).
+
+**Related:** M7, T11, T9.
+
+---
+
+### PM21
+
+**Outcome:** **Workspace AI UX** (knowledge Q&A over tasks/docs, writing assist, “project manager” nudges) aligned to University Brain + Agents paths — **gated** on **A\*** pipeline and **M4/M5** eligibility.
+
+**Implementation plan:** (1) No UI until A9+ contract stable. (2) Read-only suggestive features first. (3) Audit log every AI-assisted write. (4) Privacy: tenant opt-in, data retention.
+
+**Related:** A1–A15, M4, M5, PM13.
+
+---
+
+### PM22
+
+**Outcome:** **Goals / OKRs / portfolio** rollups and capacity-style planning — University capacity planning + goal-oriented reporting (lighter than full financial portfolio).
+
+**Implementation plan:** (1) Goal entity linking to tasks/projects. (2) Progress % from child tasks. (3) Optional capacity view when PM12 exists.
+
+**Related:** PM12, PM15, PM18.

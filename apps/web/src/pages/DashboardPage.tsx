@@ -99,6 +99,7 @@ export function DashboardPage() {
       </div>
 
       <form
+        data-testid="create-project-form"
         className="space-y-4 rounded-2xl border border-white/50 bg-white/50 p-4 shadow-[var(--shadow-neu)] backdrop-blur-md"
         onSubmit={(ev) => {
           ev.preventDefault();
@@ -117,6 +118,7 @@ export function DashboardPage() {
               id="pname"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              data-testid="project-name"
               className="mt-1 w-full rounded-xl border border-white/60 bg-white/80 px-3 py-2 text-sm"
               placeholder="Delivery board"
             />
@@ -124,6 +126,7 @@ export function DashboardPage() {
           <button
             type="submit"
             disabled={create.isPending}
+            data-testid="create-project-submit"
             className="rounded-xl bg-slate-900 px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
             {create.isPending ? 'Creating…' : 'Create'}
@@ -137,6 +140,7 @@ export function DashboardPage() {
                 (templatesQ.data?.templates ?? []).some((t) => t.templateKey === templateKey) ? templateKey : 'default'
               }
               onChange={(e) => setTemplateKey(e.target.value)}
+              data-testid="project-template"
               className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
             >
               {(templatesQ.data?.templates ?? []).length === 0 && (
@@ -154,7 +158,12 @@ export function DashboardPage() {
             )}
           </div>
           <label className="flex cursor-pointer items-center gap-2 pt-6 text-sm text-slate-700">
-            <input type="checkbox" checked={seedSampleTasks} onChange={(e) => setSeedSampleTasks(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={seedSampleTasks}
+              onChange={(e) => setSeedSampleTasks(e.target.checked)}
+              data-testid="project-seed-samples"
+            />
             Seed sample tasks from template
           </label>
         </div>
@@ -170,6 +179,9 @@ export function DashboardPage() {
           <li key={p.id}>
             <Link
               to={`/app/projects/${p.id}`}
+              data-testid="project-link"
+              data-project-id={p.id}
+              data-project-name={p.name}
               className="block rounded-2xl border border-white/50 bg-white/55 p-5 shadow-[var(--shadow-neu)] backdrop-blur-md transition hover:bg-white/75"
             >
               <span className="font-semibold text-slate-900">{p.name}</span>

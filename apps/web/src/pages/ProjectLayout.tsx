@@ -1,10 +1,14 @@
-import { Link, NavLink, Outlet, useParams, useMatch } from 'react-router-dom';
+import { Link, NavLink, Outlet, useParams, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiJson } from '../api/client';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CreateBoardModal } from './CreateBoardModal';
+import { ImportExcelModal } from './ImportExcelModal';
 import { ProjectHeader } from '../components/project/ProjectHeader';
 import { ProjectTabs } from '../components/project/ProjectTabs';
+import { BoardSwitcher } from '../components/project/BoardSwitcher';
+import { useRecentNavigation } from '../hooks/useRecentNavigation';
+import { boardShellAppPath, parseBoardIdFromProjectPath, shellViewFromPathname, setBoardShellView } from '../hooks/useBoardShellView';
 
 type ProjectRow = {
   id: string;
@@ -14,10 +18,15 @@ type ProjectRow = {
 
 export function ProjectLayout() {
   const { projectId } = useParams<{ projectId: string }>();
-  const boardMatch = useMatch('/app/projects/:projectId/boards/:boardId');
-  const boardId = boardMatch?.params.boardId;
+  const location = useLocation();
+  const routeBoardId = useMemo(
+    () => (projectId ? parseBoardIdFromProjectPath(projectId, location.pathname) : undefined),
+    [projectId, location.pathname]
+  );
   const qc = useQueryClient();
   const [createBoardOpen, setCreateBoardOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const { push: pushRecent } = useRecentNavigation();
 
   const meQ = useQuery({
     queryKey: ['me-project-layout'],
@@ -31,15 +40,37 @@ export function ProjectLayout() {
   });
 
   const project = pq.data?.projects.find((p) => p.id === projectId);
-  const boards = project?.boards ?? [];
+  const boards = useMemo(() => project?.boards ?? [], [project]);
   const projectMissing =
     Boolean(projectId) && pq.isSuccess && !pq.isFetching && project === undefined;
   const role = meQ.data?.membership.role ?? '';
   const canManage = ['ADMIN', 'MANAGER'].includes(role);
   const isAdmin = role === 'ADMIN';
   const defaultBoardId = boards[0]?.id;
-  const activeBoardId = boardId ?? defaultBoardId;
-  const activeBoardName = boards.find((b) => b.id === activeBoardId)?.name ?? (boards[0]?.name ?? 'Board');
+  const activeBoardId = routeBoardId ?? defaultBoardId;
+
+  useEffect(() => {
+    if (!routeBoardId) return;
+    const inferred = shellViewFromPathname(location.pathname, routeBoardId);
+    if (inferred) setBoardShellView(routeBoardId, inferred);
+  }, [routeBoardId, location.pathname]);
+
+  /**
+   * M7/M8 — Record the current board into Cmd/Ctrl+K palette recents whenever
+   * the user lands on a board route. Empty boards (no boardId in URL) and
+   * unknown boards are skipped.
+   */
+  useEffect(() => {
+    if (!projectId || !routeBoardId || !project) return;
+    const found = boards.find((b) => b.id === routeBoardId);
+    if (!found) return;
+    pushRecent({
+      key: `b:${routeBoardId}`,
+      label: `${project.name} · ${found.name}`,
+      to: boardShellAppPath(projectId, routeBoardId),
+      hint: 'Board',
+    });
+  }, [projectId, routeBoardId, project, boards, pushRecent, location.pathname]);
 
   return (
     <div className="space-y-0">
@@ -75,45 +106,46 @@ export function ProjectLayout() {
       )}
       <div className="border-b border-white/50 bg-white/60 px-6 py-4 shadow-sm backdrop-blur-xl">
         <div className="mx-auto max-w-6xl space-y-3">
-          <ProjectHeader projectName={project?.name ?? 'Project'} />
+          <ProjectHeader
+            workspaceName={meQ.data?.tenant?.name ?? 'Workspace'}
+            projectId={projectId ?? ''}
+            projectName={project?.name ?? 'Project'}
+            activeBoardId={activeBoardId}
+            isAdmin={isAdmin}
+          />
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <ProjectTabs projectId={projectId ?? ''} activeBoardId={activeBoardId} />
               {boards.length > 0 && projectId && (
-                <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white/70 px-3 py-2">
-                  <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Board</span>
-                  <select
-                    value={activeBoardId ?? ''}
-                    onChange={(e) => {
-                      const next = e.target.value;
-                      if (!next) return;
-                      // hard navigate via location so we don't need a hook here
-                      window.location.href = `/app/projects/${projectId}/boards/${encodeURIComponent(next)}`;
-                    }}
-                    className="max-w-[240px] truncate bg-transparent text-sm font-semibold text-slate-800 outline-none"
-                    aria-label="Select board"
-                  >
-                    {boards.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="text-[10px] font-semibold text-slate-500" title={activeBoardName}>
-                    {activeBoardName}
-                  </span>
-                </div>
+                <BoardSwitcher
+                  projectId={projectId}
+                  projectName={project?.name ?? 'Project'}
+                  activeBoardId={activeBoardId ?? undefined}
+                  boards={boards.map((b) => ({ id: b.id, name: b.name }))}
+                  canManage={canManage}
+                  onCreateBoard={() => setCreateBoardOpen(true)}
+                />
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {canManage && (
-                <button
-                  type="button"
-                  onClick={() => setCreateBoardOpen(true)}
-                  className="rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-white"
-                >
-                  + Board
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setCreateBoardOpen(true)}
+                    className="rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-white"
+                  >
+                    + Board
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImportOpen(true)}
+                    className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-800 hover:bg-indigo-100"
+                    title="Create a new board from an Excel/CSV file"
+                  >
+                    Import from Excel
+                  </button>
+                </>
               )}
               {isAdmin && (
                 <NavLink
@@ -128,7 +160,7 @@ export function ProjectLayout() {
                 </NavLink>
               )}
               <NavLink
-                to={`/app/projects/${projectId}/reports${boardId ? `?boardId=${encodeURIComponent(boardId)}` : ''}`}
+                to={`/app/projects/${projectId}/reports${routeBoardId ? `?boardId=${encodeURIComponent(routeBoardId)}` : ''}`}
                 className={({ isActive }) =>
                   `rounded-xl px-3 py-2 text-sm font-semibold ${
                     isActive ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white/80 text-slate-700 hover:bg-white'
@@ -149,12 +181,22 @@ export function ProjectLayout() {
       </div>
 
       {projectId && (
-        <CreateBoardModal
-          projectId={projectId}
-          open={createBoardOpen}
-          onClose={() => setCreateBoardOpen(false)}
-          onCreated={() => void qc.invalidateQueries({ queryKey: ['projects'] })}
-        />
+        <>
+          <CreateBoardModal
+            projectId={projectId}
+            open={createBoardOpen}
+            onClose={() => setCreateBoardOpen(false)}
+            onCreated={() => void qc.invalidateQueries({ queryKey: ['projects'] })}
+          />
+          <ImportExcelModal
+            projectId={projectId}
+            open={importOpen}
+            onClose={() => {
+              setImportOpen(false);
+              void qc.invalidateQueries({ queryKey: ['projects'] });
+            }}
+          />
+        </>
       )}
     </div>
   );

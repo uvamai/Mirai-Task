@@ -23,6 +23,7 @@ export const planMatrix: PlanMatrixItem[] = [
       'Up to 200 total tasks',
       'Kanban + list views',
       'Starter built-in templates',
+      'Excel/CSV import (up to 200 rows · 2/hour)',
     ],
     ctaLabel: 'Start free',
     ctaHref: '/register?plan=starter',
@@ -41,6 +42,7 @@ export const planMatrix: PlanMatrixItem[] = [
       'Invite links + revoke/regenerate',
       'Comments, mentions, notifications',
       'Custom board columns + resize',
+      'Excel/CSV import (up to 5,000 rows · 10/hour)',
     ],
     ctaLabel: 'Coming soon',
     ctaDisabled: true,
@@ -60,6 +62,7 @@ export const planMatrix: PlanMatrixItem[] = [
       'SLA defaults by priority',
       'My Work cross-board queue',
       'Org custom templates',
+      'Excel/CSV import (up to 50,000 rows · 30/hour)',
     ],
     ctaLabel: 'Coming soon',
     ctaDisabled: true,
@@ -77,6 +80,7 @@ export const planMatrix: PlanMatrixItem[] = [
       'Dedicated support channel + custom SLA',
       'Compliance and legal-hold workflows',
       'Advanced integration and governance controls',
+      'Unlimited Excel/CSV import (no row or rate cap)',
     ],
     ctaLabel: 'Contact Sales',
     ctaHref: '/contact-sales',
@@ -85,4 +89,4 @@ export const planMatrix: PlanMatrixItem[] = [
 ];
 
 export const planAvailabilityNotice =
-  'Only Starter and Enterprise are available right now. Standard and Pro checkout will be enabled once payments are live. The AI/automation board and agent execution features require Enterprise with an active subscription.';
+  'Only Starter and Enterprise are available right now. Standard and Pro checkout will be enabled once payments are live. The AI/automation board and agent execution features require Enterprise with an active subscription. Imported boards count toward your per-project board limit on every plan.';

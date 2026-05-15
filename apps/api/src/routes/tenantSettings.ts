@@ -3,6 +3,8 @@ import Joi from 'joi';
 import { authenticateJwt, loadMembership, requireRole } from '../middleware/auth';
 import { Tenant } from '../models';
 import { slaDaysByPrioritySchema } from '../validation/projects';
+import { assertTenantRateLimit, TenantRateLimitError } from '../services/planLimits';
+import { logger } from '../logger';
 
 export const tenantSettingsRouter = Router();
 
@@ -78,6 +80,29 @@ tenantSettingsRouter.patch(
     if (!tenant) {
       res.status(404).json({ error: 'Not found' });
       return;
+    }
+    /**
+     * P12 — Throttle template save / tag catalog churn per tenant. Conservative cap
+     * because both mutate a tenant-wide settings blob that downstream caches read.
+     */
+    if (value.customBoardTemplates !== undefined || value.tagCatalog !== undefined) {
+      try {
+        assertTenantRateLimit({
+          tenantId: req.tenantId!,
+          key: 'tenant_settings_write',
+          cap: 30,
+          window: 'hour',
+          label: 'Tenant settings update',
+        });
+      } catch (e) {
+        if (e instanceof TenantRateLimitError) {
+          res.setHeader('Retry-After', String(e.retryAfterSeconds));
+          res.status(429).json({ error: e.message, code: e.code, retryAfterSeconds: e.retryAfterSeconds });
+          return;
+        }
+        logger.error('tenant settings rate-limit error', { err: e, requestId: req.requestId });
+        throw e;
+      }
     }
     if (value.estimateMode !== undefined) {
       tenant.settings = { ...tenant.settings, estimateMode: value.estimateMode };

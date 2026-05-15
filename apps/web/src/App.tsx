@@ -23,6 +23,8 @@ import { TenantOrgSettingsPage } from './pages/TenantOrgSettingsPage';
 import { MyWorkPage } from './pages/MyWorkPage';
 import { ProjectItsmSettingsPage } from './pages/ProjectItsmSettingsPage';
 import { ProjectAutomationsPage } from './pages/ProjectAutomationsPage';
+import { ProjectGettingStartedPage } from './pages/ProjectGettingStartedPage';
+import { ProjectTemplatesPage } from './pages/ProjectTemplatesPage';
 import { ContactSalesPage } from './pages/ContactSalesPage';
 import { AdminPortalDashboardPage } from './pages/AdminPortalDashboardPage';
 import { AdminPortalUsersPage } from './pages/AdminPortalUsersPage';
@@ -46,8 +48,11 @@ export default function App() {
         <Route path="projects/:projectId" element={<ProjectLayout />}>
           <Route index element={<ProjectBoardIndex />} />
           <Route path="boards/:boardId/list" element={<TaskListPage />} />
+          <Route path="boards/:boardId/table" element={<TaskListPage />} />
           <Route path="boards/:boardId/calendar" element={<TaskCalendarPage />} />
           <Route path="boards/:boardId" element={<BoardPage />} />
+          <Route path="getting-started" element={<ProjectGettingStartedPage />} />
+          <Route path="templates" element={<ProjectTemplatesPage />} />
           <Route path="team" element={<ProjectTeamPage />} />
           <Route path="reports" element={<ProjectReportsPage />} />
           <Route path="automations" element={<ProjectAutomationsPage />} />

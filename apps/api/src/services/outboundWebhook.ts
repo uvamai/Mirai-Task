@@ -1,8 +1,14 @@
 import { createHmac } from 'crypto';
 import { Project } from '../models';
 import { logger } from '../logger';
+import { tryTenantRateLimit } from './planLimits';
 
-export type WebhookEvent = 'task.assigned' | 'task.updated' | 'sla.warning' | 'sla.soft_breach';
+export type WebhookEvent =
+  | 'task.assigned'
+  | 'task.updated'
+  | 'sla.warning'
+  | 'sla.soft_breach'
+  | 'board.imported';
 
 export type ProjectWebhook = {
   id: string;
@@ -81,6 +87,13 @@ async function appendWebhookDeliveryLog(
   }
 }
 
+/**
+ * P12 — soft cap so a misbehaving project can't burst outbound deliveries from
+ * a tight automation loop. 120 fires / minute / tenant feels generous for normal
+ * traffic and below most provider rate limits. Drops silently with a warn.
+ */
+const WEBHOOK_FANOUT_CAP_PER_MINUTE = 120;
+
 export async function fireProjectWebhooks(options: {
   settings: Record<string, unknown>;
   event: WebhookEvent;
@@ -93,6 +106,30 @@ export async function fireProjectWebhooks(options: {
   const entries: WebhookDeliveryEntry[] = [];
   for (const h of hooks) {
     if (!h.events.includes(options.event)) continue;
+    if (options.tenantId) {
+      const allowed = tryTenantRateLimit({
+        tenantId: options.tenantId,
+        key: 'webhook_fanout',
+        cap: WEBHOOK_FANOUT_CAP_PER_MINUTE,
+        window: 'minute',
+      });
+      if (!allowed) {
+        logger.warn('webhook fanout dropped — tenant rate limit', {
+          tenantId: options.tenantId,
+          projectId: options.projectId,
+          event: options.event,
+          webhookId: h.id,
+        });
+        entries.push({
+          at: new Date().toISOString(),
+          webhookId: h.id,
+          event: options.event,
+          ok: false,
+          httpStatus: 0,
+        });
+        continue;
+      }
+    }
     const r = await postWithRetry(h.url, h.secret, body);
     entries.push({
       at: new Date().toISOString(),

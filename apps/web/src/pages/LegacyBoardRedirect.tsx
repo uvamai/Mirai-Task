@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiJson } from '../api/client';
+import { boardShellAppPath } from '../hooks/useBoardShellView';
 
 export function LegacyBoardRedirect() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -20,5 +21,5 @@ export function LegacyBoardRedirect() {
   if (q.isError) return <Navigate to="/app" replace />;
   const first = q.data?.boards[0]?.id;
   if (!first) return <Navigate to="/app" replace />;
-  return <Navigate to={`/app/projects/${projectId}/boards/${first}`} replace />;
+  return <Navigate to={boardShellAppPath(projectId, first)} replace />;
 }

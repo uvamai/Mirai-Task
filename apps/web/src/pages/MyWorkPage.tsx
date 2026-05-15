@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useMemo, useState } from 'react';
 import { apiJson } from '../api/client';
 import { TagPill } from '../components/TagPill';
+import { boardShellAppPath } from '../hooks/useBoardShellView';
 
 type Row = {
   id: string;
@@ -75,7 +76,7 @@ export function MyWorkPage() {
           {sorted.map((t) => (
             <li key={t.id}>
               <Link
-                to={`/app/projects/${t.projectId}/boards/${t.boardId}`}
+                to={boardShellAppPath(t.projectId, t.boardId)}
                 className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl border border-white/50 bg-white/55 px-4 py-3 text-sm shadow-sm backdrop-blur-md hover:border-indigo-200"
               >
                 <span>
