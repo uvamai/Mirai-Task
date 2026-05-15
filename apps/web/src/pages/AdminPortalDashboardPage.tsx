@@ -1,8 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
+import { useOutletContext, Navigate } from 'react-router-dom';
 import { fetchAdminDashboard } from '../api/globalAdmin';
 
 export function AdminPortalDashboardPage() {
-  const q = useQuery({ queryKey: ['admin-dashboard'], queryFn: fetchAdminDashboard });
+  const { isGlobalAdmin } = useOutletContext<{ isGlobalAdmin?: boolean }>();
+  const q = useQuery({
+    queryKey: ['admin-dashboard'],
+    queryFn: fetchAdminDashboard,
+    enabled: isGlobalAdmin !== false,
+  });
+
+  if (isGlobalAdmin === false) {
+    return <Navigate to="/app" replace />;
+  }
 
   if (q.isLoading) return <p className="text-sm text-slate-600">Loading admin dashboard…</p>;
   if (q.isError || !q.data) return <p className="text-sm text-rose-700">Could not load admin dashboard.</p>;

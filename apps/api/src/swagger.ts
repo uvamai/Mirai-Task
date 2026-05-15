@@ -84,7 +84,7 @@ export const swaggerSpec = {
       get: {
         summary: 'Current user + tenant context',
         security: [{ bearerAuth: [] }],
-        responses: { '200': { description: 'Profile' } },
+        responses: { '200': { description: 'Profile including isGlobalAdmin flag' } },
       },
     },
     '/projects': {

@@ -22,7 +22,11 @@ export function AppShell() {
   const meShell = useQuery({
     queryKey: ['me-shell'],
     queryFn: () =>
-      apiJson<{ membership: { role: string }; tenant: { id: string; name: string } | null }>('/auth/me'),
+      apiJson<{
+        membership: { role: string };
+        tenant: { id: string; name: string } | null;
+        isGlobalAdmin: boolean;
+      }>('/auth/me'),
     enabled: Boolean(accessToken),
   });
 
@@ -122,12 +126,22 @@ export function AppShell() {
     navigate('/');
   }
 
+  if (meShell.isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900" />
+      </div>
+    );
+  }
+
   const unread = unreadQ.data?.count ?? 0;
   const tenantName = meShell.data?.tenant?.name ?? 'Workspace';
   const isAdmin = meShell.data?.membership.role === 'ADMIN';
+  const apiTenantId = meShell.data?.tenant?.id;
+  const isGlobalAdmin = !!meShell.data?.isGlobalAdmin;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-indigo-50/40">
+    <div className="min-h-screen bg-zinc-50 text-zinc-900">
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <a
         href="#app-main-content"
@@ -136,7 +150,7 @@ export function AppShell() {
         Skip to main content
       </a>
       <div className="flex w-full">
-        <LeftNav tenantName={tenantName} isAdmin={isAdmin} onCollapseChange={setLeftCollapsed} />
+        <LeftNav tenantName={tenantName} isAdmin={isAdmin} isGlobalAdmin={isGlobalAdmin} onCollapseChange={setLeftCollapsed} />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <TopCommandBar
             tenantName={tenantName}
@@ -158,7 +172,7 @@ export function AppShell() {
             }
             tabIndex={-1}
           >
-            <Outlet />
+            <Outlet context={{ isAdmin, isGlobalAdmin, tenantId: apiTenantId }} />
           </main>
         </div>
       </div>

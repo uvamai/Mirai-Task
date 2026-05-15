@@ -1,89 +1,68 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
-  --radius-glass: 1.25rem;
-  --shadow-neu: 8px 8px 20px rgba(15, 23, 42, 0.12), -6px -6px 18px rgba(255, 255, 255, 0.85);
-  --shadow-neu-inset: inset 4px 4px 10px rgba(15, 23, 42, 0.08), inset -3px -3px 10px rgba(255, 255, 255, 0.9);
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --radius-glass: 0.5rem;
+  --shadow-neu: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+  --shadow-neu-inset: inset 0 2px 4px 0 rgb(0 0 0 / 0.02);
 }
 
 body {
   font-family: var(--font-sans);
-  background: radial-gradient(1200px 600px at 10% -10%, #c7d2fe 0%, transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, #a5f3fc 0%, transparent 50%),
-    linear-gradient(180deg, #e8eef9 0%, #dbeafe 40%, #e0e7ff 100%);
-  color: #0f172a;
+  background-color: #fafafa;
+  color: #09090b;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Design system utilities (glassmorphic shell) */
+/* Transition glassmorphism classes into crisp Neo-Minimal flat surfaces */
 .glass-card {
-  background: rgba(255, 255, 255, 0.38);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.42);
-  box-shadow: 0 10px 28px rgba(31, 38, 135, 0.08);
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  border-radius: 0.5rem;
 }
 
 .glass-panel {
-  background: rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  box-shadow: 0 8px 26px rgba(31, 38, 135, 0.06);
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  border-radius: 0.5rem;
 }
 
 .glass-header {
-  background: rgba(248, 249, 255, 0.78);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.55);
+  background: #ffffff;
+  border-bottom: 1px solid #e4e4e7;
 }
 
 .glass-sidebar {
-  background: rgba(15, 23, 42, 0.82);
-  backdrop-filter: blur(22px);
-  -webkit-backdrop-filter: blur(22px);
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: #ffffff;
+  border-right: 1px solid #e4e4e7;
 }
 
-/**
- * M6 system tokens (added 2026-05). Use these instead of bespoke combinations so the
- * canvas/inspector/toolbar/modal surfaces read coherently. Existing `glass-card`
- * `glass-panel` `glass-header` `glass-sidebar` classes above are kept for backwards
- * compatibility — new code should reach for the M6 set below.
- */
 .glass-surface {
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
 .glass-toolbar {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02);
 }
 
-/**
- * Solid white card on top of a scrim. Used by modal dialogs (.95 alpha so the scrim
- * still tints the very edges; reads as opaque to the eye). Pair with the centre-modal
- * wrapper `fixed inset-0 ... bg-slate-900/50 backdrop-blur-sm`.
- */
 .glass-modal-card {
-  background: rgba(255, 255, 255, 0.97);
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  box-shadow: 0 25px 60px -10px rgba(15, 23, 42, 0.35);
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  border-radius: 0.75rem;
 }
 
-/** Used inside an inspector / detail card to group properties without competing with the parent surface. */
 .glass-section {
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(226, 232, 240, 0.7);
-  border-radius: 0.75rem;
+  background: #fafafa;
+  border: 1px solid #e4e4e7;
+  border-radius: 0.375rem;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -94,6 +73,93 @@ body {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(99, 102, 241, 0.22);
+  background: #e4e4e7;
   border-radius: 999px;
 }
+
+/* Global overrides to force hardcoded inline legacy styles into the modern minimalist design system */
+.backdrop-blur-md, 
+.backdrop-blur-lg, 
+.backdrop-blur-xl, 
+.backdrop-blur-2xl {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.rounded-2xl, 
+.rounded-3xl, 
+.rounded-\[var\(--radius-glass\)\] {
+  border-radius: 0.5rem !important;
+}
+
+/* Remap translucent white borders to crisp solid zinc borders */
+.border-white\/10,
+.border-white\/15,
+.border-white\/20,
+.border-white\/30,
+.border-white\/35,
+.border-white\/40,
+.border-white\/45,
+.border-white\/50,
+.border-white\/55,
+.border-white\/60,
+.border-white\/70 {
+  border-color: #e4e4e7 !important;
+}
+
+/* Remap translucent white backgrounds to flat solid white panels */
+.bg-white\/10,
+.bg-white\/25,
+.bg-white\/30,
+.bg-white\/35,
+.bg-white\/40,
+.bg-white\/50,
+.bg-white\/55,
+.bg-white\/60,
+.bg-white\/70,
+.bg-white\/75,
+.bg-white\/80,
+.bg-white\/90 {
+  background-color: #ffffff !important;
+}
+
+/* Upgrade gradient buttons to modern solid Indigo */
+.bg-gradient-to-br.from-indigo-600.to-sky-500 {
+  background-image: none !important;
+  background-color: #4f46e5 !important; /* Solid Indigo-600 */
+}
+
+/* Strip outer floating background gradients that might be set on body or wrapper */
+.bg-gradient-to-br.from-slate-100.via-white.to-indigo-50\/40 {
+  background: #fafafa !important;
+}
+
+/* Tighten and normalize input components to clean modern minimalist look */
+input, select, textarea {
+  border-color: #e4e4e7 !important;
+  background-color: #ffffff !important;
+  border-radius: 0.375rem !important;
+  box-shadow: none !important;
+}
+
+/* Button visual upgrades to modern flat styling */
+.bg-slate-900,
+.bg-slate-900\/90 {
+  background-color: #09090b !important; /* Crisp Zinc-950 */
+  border-radius: 0.375rem !important;
+}
+
+/* Override specific legacy hardcoded column shadows to flat modern shadows */
+.shadow-\[0_12px_40px_rgba\(15\,23\,42\,0\.06\)\],
+.shadow-sm,
+.shadow-lg,
+.shadow-\[var\(--shadow-neu\)\] {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05) !important;
+}
+
+/* Input outline cleanups */
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid #6366f1 !important;
+  outline-offset: -1px !important;
+}
+
