@@ -116,7 +116,6 @@ export function TaskGanttPage() {
               headerHeight={60}
               rowHeight={50}
               barCornerRadius={8}
-              handleSize={8}
             />
           </div>
         ) : (

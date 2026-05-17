@@ -5,25 +5,47 @@ import { apiJson } from '../../api/client';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { useRecentNavigation, type RecentItem } from '../../hooks/useRecentNavigation';
 import { boardShellAppPath } from '../../hooks/useBoardShellView';
+import {
+  Search, Folder, LayoutDashboard, Clock, ChevronRight,
+  CheckSquare, Layers, Home, Star,
+} from 'lucide-react';
 
 type ProjectRow = { id: string; name: string; boards?: { id: string; name: string }[] };
+type MyWorkRow = { id: string; key: string; title: string; status: string; priority: string; projectId: string; boardId: string; projectName: string };
 
 type Item = {
   key: string;
   label: string;
   hint?: string;
+  sub?: string;
   to: string;
-  /** Used for the "Recent" group divider; not rendered on each row. */
-  group?: 'recent' | 'projects' | 'boards';
+  group?: 'recent' | 'projects' | 'boards' | 'tasks' | 'pages';
+  icon?: React.ReactNode;
 };
 
-export function CommandPalette({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
+const prioColors: Record<string, string> = {
+  P0: 'bg-red-100 text-red-700',
+  P1: 'bg-orange-100 text-orange-700',
+  P2: 'bg-amber-100 text-amber-700',
+  P3: 'bg-blue-100 text-blue-700',
+  P4: 'bg-slate-100 text-slate-500',
+};
+
+const GROUP_META: Record<string, { label: string; icon: React.ReactNode }> = {
+  recent: { label: 'Recent', icon: <Clock size={11} /> },
+  pages: { label: 'Navigation', icon: <Home size={11} /> },
+  projects: { label: 'Projects', icon: <Folder size={11} /> },
+  boards: { label: 'Boards', icon: <Layers size={11} /> },
+  tasks: { label: 'My Tasks', icon: <CheckSquare size={11} /> },
+};
+
+const STATIC_PAGES: Item[] = [
+  { key: 'nav:home', label: 'Home — Command Centre', hint: '/app', to: '/app', group: 'pages', icon: <Home size={14} className="text-indigo-500" /> },
+  { key: 'nav:my-work', label: 'My Tasks', hint: '/app/my-work', to: '/app/my-work', group: 'pages', icon: <CheckSquare size={14} className="text-emerald-500" /> },
+  { key: 'nav:employees', label: 'Team Members', hint: '/app/employees', to: '/app/employees', group: 'pages', icon: <LayoutDashboard size={14} className="text-blue-500" /> },
+];
+
+export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const nav = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -40,15 +62,14 @@ export function CommandPalette({
     enabled: open,
   });
 
-  /**
-   * Build the candidate list. When the search box is empty we show the recent
-   * navigation history (last 8) first so users can hop back fast; otherwise we
-   * fall back to the full project/board fuzzy list as before.
-   */
+  const myWorkQ = useQuery({
+    queryKey: ['my-work'],
+    queryFn: () => apiJson<{ tasks: MyWorkRow[] }>('/tasks/my-work'),
+    enabled: open,
+  });
+
   const all = useMemo(() => {
-    const out: Item[] = [];
-    /** Always include "Home" as a stable first entry; it never appears in recents. */
-    out.push({ key: 'home', label: 'Projects (home)', hint: '/app', to: '/app', group: 'projects' });
+    const out: Item[] = [...STATIC_PAGES];
     for (const p of projectsQ.data?.projects ?? []) {
       out.push({
         key: `p:${p.id}`,
@@ -56,19 +77,33 @@ export function CommandPalette({
         hint: 'Project',
         to: `/app/projects/${p.id}`,
         group: 'projects',
+        icon: <Folder size={14} className="text-indigo-400" />,
       });
       for (const b of p.boards ?? []) {
         out.push({
           key: `b:${b.id}`,
-          label: `${p.name} · ${b.name}`,
+          label: b.name,
+          sub: p.name,
           hint: 'Board',
           to: boardShellAppPath(p.id, b.id),
           group: 'boards',
+          icon: <Layers size={14} className="text-violet-400" />,
         });
       }
     }
+    for (const t of myWorkQ.data?.tasks ?? []) {
+      out.push({
+        key: `t:${t.id}`,
+        label: t.title,
+        sub: `${t.key} · ${t.projectName}`,
+        hint: t.priority,
+        to: boardShellAppPath(t.projectId, t.boardId),
+        group: 'tasks',
+        icon: <CheckSquare size={14} className="text-emerald-500" />,
+      });
+    }
     return out;
-  }, [projectsQ.data]);
+  }, [projectsQ.data, myWorkQ.data]);
 
   const filtered = useMemo<Item[]>(() => {
     const needle = q.trim().toLowerCase();
@@ -79,30 +114,35 @@ export function CommandPalette({
         hint: r.hint ?? 'Recent',
         to: r.to,
         group: 'recent',
+        icon: <Star size={14} className="text-amber-400" />,
       }));
-      /** Filter out current page from recents (don't navigate to self). */
       const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
-      const recentDeduped = recentItems.filter((r) => r.to !== currentPath);
-      return [...recentDeduped, ...all].slice(0, 18);
+      const deduped = recentItems.filter((r) => r.to !== currentPath);
+      return [...deduped, ...STATIC_PAGES, ...(projectsQ.data?.projects ?? []).slice(0, 5).map(p => ({
+        key: `p:${p.id}`,
+        label: p.name,
+        hint: 'Project',
+        to: `/app/projects/${p.id}`,
+        group: 'projects' as const,
+        icon: <Folder size={14} className="text-indigo-400" />,
+      }))].slice(0, 18);
     }
     return all
-      .filter((i) => i.label.toLowerCase().includes(needle) || (i.hint ?? '').toLowerCase().includes(needle))
+      .filter((i) =>
+        i.label.toLowerCase().includes(needle) ||
+        (i.sub ?? '').toLowerCase().includes(needle) ||
+        (i.hint ?? '').toLowerCase().includes(needle)
+      )
       .slice(0, 18);
-  }, [all, q, recents]);
+  }, [all, q, recents, projectsQ.data]);
 
-  /** Reset cursor when the visible set changes. */
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [q, open]);
-
-  /** Keep the active row in view as the user arrows down through results. */
-  useEffect(() => {
-    activeRowRef.current?.scrollIntoView({ block: 'nearest' });
-  }, [activeIndex]);
+  useEffect(() => { setActiveIndex(0); }, [q, open]);
+  useEffect(() => { activeRowRef.current?.scrollIntoView({ block: 'nearest' }); }, [activeIndex]);
+  // Reset query when closed
+  useEffect(() => { if (!open) setQ(''); }, [open]);
 
   function commit(item: Item) {
-    /** Record into recents (skip the synthetic 'home' entry). */
-    if (item.key !== 'home') {
+    if (!item.key.startsWith('nav:')) {
       pushRecent({
         key: item.key.replace(/^r:/, ''),
         label: item.label,
@@ -116,106 +156,109 @@ export function CommandPalette({
 
   if (!open) return null;
 
-  /** Grouped section labels keep the empty-state palette scannable. */
-  const showGroupHeaders = q.trim() === '';
+  const showGroupHeaders = true;
 
   return (
     <>
+      {/* Backdrop */}
       <div
-        className="fixed inset-0 z-[120] bg-slate-900/35 backdrop-blur-[1px]"
+        className="fixed inset-0 z-[120] bg-slate-900/40 backdrop-blur-[2px]"
         role="presentation"
         onMouseDown={onClose}
       />
+
+      {/* Dialog */}
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Quick navigation"
+        aria-label="Command palette"
         tabIndex={-1}
-        className="fixed left-1/2 top-[12vh] z-[130] w-[min(720px,calc(100vw-2rem))] -translate-x-1/2"
+        className="fixed left-1/2 top-[10vh] z-[130] w-[min(680px,calc(100vw-2rem))] -translate-x-1/2"
+        style={{ animation: 'fadeInUp 0.18s ease both' }}
       >
-        <div className="glass-modal-card rounded-2xl p-3">
-          <div className="flex items-center gap-2 rounded-xl border border-white/60 bg-white/40 px-3 py-2">
-            <span className="text-xs font-bold uppercase tracking-wide text-slate-600">Search</span>
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+          {/* Search input */}
+          <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
+            <Search size={16} className="shrink-0 text-slate-400" />
             <input
               ref={inputRef}
               autoFocus
               value={q}
               onChange={(e) => setQ(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  e.preventDefault();
-                  onClose();
-                  return;
-                }
-                if (e.key === 'ArrowDown') {
-                  e.preventDefault();
-                  setActiveIndex((i) => Math.min(filtered.length - 1, i + 1));
-                  return;
-                }
-                if (e.key === 'ArrowUp') {
-                  e.preventDefault();
-                  setActiveIndex((i) => Math.max(0, i - 1));
-                  return;
-                }
-                if (e.key === 'Home') {
-                  e.preventDefault();
-                  setActiveIndex(0);
-                  return;
-                }
-                if (e.key === 'End') {
-                  e.preventDefault();
-                  setActiveIndex(Math.max(0, filtered.length - 1));
-                  return;
-                }
+                if (e.key === 'Escape') { e.preventDefault(); onClose(); return; }
+                if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIndex((i) => Math.min(filtered.length - 1, i + 1)); return; }
+                if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIndex((i) => Math.max(0, i - 1)); return; }
+                if (e.key === 'Home') { e.preventDefault(); setActiveIndex(0); return; }
+                if (e.key === 'End') { e.preventDefault(); setActiveIndex(Math.max(0, filtered.length - 1)); return; }
                 if (e.key === 'Enter') {
                   const target = filtered[activeIndex];
-                  if (target) {
-                    e.preventDefault();
-                    commit(target);
-                  }
+                  if (target) { e.preventDefault(); commit(target); }
                 }
               }}
-              placeholder="Jump to project / board — try a name, ↑/↓ to navigate"
-              className="w-full bg-transparent text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-500"
+              placeholder="Search projects, boards, my tasks…"
+              className="flex-1 bg-transparent text-sm font-medium text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-400"
             />
-            <span className="rounded-lg bg-white/60 px-2 py-1 text-[10px] font-bold text-slate-600">Esc</span>
+            <kbd className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-400">
+              ESC
+            </kbd>
           </div>
 
-          <div className="custom-scrollbar mt-2 max-h-[56vh] overflow-y-auto">
-            {projectsQ.isLoading && <p className="px-3 py-3 text-sm text-slate-600">Loading…</p>}
-            {projectsQ.isError && <p className="px-3 py-3 text-sm text-rose-700">Could not load projects.</p>}
-            {!projectsQ.isLoading &&
-              filtered.map((i, idx) => {
+          {/* Results */}
+          <div className="custom-scrollbar max-h-[60vh] overflow-y-auto py-2">
+            {(projectsQ.isLoading || myWorkQ.isLoading) && (
+              <div className="px-4 py-3 space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-9 animate-pulse rounded-lg bg-slate-100" />)}
+              </div>
+            )}
+            {!projectsQ.isLoading && !myWorkQ.isLoading &&
+              filtered.map((item, idx) => {
                 const prev = filtered[idx - 1];
-                const showHeader = showGroupHeaders && (idx === 0 || prev?.group !== i.group);
+                const showHeader = showGroupHeaders && (idx === 0 || prev?.group !== item.group);
+                const isActive = idx === activeIndex;
+                const gm = GROUP_META[item.group ?? 'projects'];
                 return (
-                  <div key={i.key}>
+                  <div key={item.key}>
                     {showHeader && (
-                      <div className="mt-2 px-3 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                        {i.group === 'recent' ? 'Recent' : i.group === 'boards' ? 'Boards' : 'Projects'}
+                      <div className="flex items-center gap-1.5 px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        {gm?.icon} {gm?.label}
                       </div>
                     )}
                     <button
                       ref={idx === activeIndex ? activeRowRef : undefined}
                       type="button"
                       onMouseEnter={() => setActiveIndex(idx)}
-                      onClick={() => commit(i)}
-                      aria-selected={idx === activeIndex}
-                      className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold transition ${
-                        idx === activeIndex
+                      onClick={() => commit(item)}
+                      aria-selected={isActive}
+                      className={`flex w-full items-center gap-3 rounded-xl mx-2 px-3 py-2.5 text-left text-sm transition ${
+                        isActive
                           ? 'bg-indigo-600 text-white shadow-sm'
-                          : 'text-slate-800 hover:bg-white/55'
+                          : 'text-slate-800 hover:bg-slate-50'
                       }`}
+                      style={{ width: 'calc(100% - 16px)' }}
                     >
-                      <span className="min-w-0 flex-1 truncate">{i.label}</span>
-                      {i.hint && (
-                        <span
-                          className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${
-                            idx === activeIndex ? 'bg-white/25 text-white' : 'bg-white/60 text-slate-600'
-                          }`}
-                        >
-                          {i.hint}
+                      {item.icon && (
+                        <span className={`shrink-0 ${isActive ? 'opacity-90' : ''}`}>{item.icon}</span>
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">{item.label}</span>
+                        {item.sub && (
+                          <span className={`block truncate text-[11px] ${isActive ? 'text-indigo-200' : 'text-slate-400'}`}>
+                            {item.sub}
+                          </span>
+                        )}
+                      </span>
+                      {item.hint && item.group === 'tasks' && (
+                        <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                          isActive ? 'bg-white/20 text-white' : (prioColors[item.hint] ?? 'bg-slate-100 text-slate-500')
+                        }`}>
+                          {item.hint}
+                        </span>
+                      )}
+                      {item.group !== 'tasks' && item.hint && (
+                        <span className={`shrink-0 flex items-center gap-1 text-[11px] font-medium ${isActive ? 'text-indigo-200' : 'text-slate-400'}`}>
+                          {item.hint} <ChevronRight size={11} />
                         </span>
                       )}
                     </button>
@@ -223,20 +266,27 @@ export function CommandPalette({
                 );
               })}
             {!projectsQ.isLoading && filtered.length === 0 && (
-              <p className="px-3 py-3 text-sm text-slate-600">No matches.</p>
+              <div className="flex flex-col items-center py-10 text-center text-sm text-slate-500">
+                <Search size={28} className="text-slate-200 mb-2" />
+                No results for "{q}"
+              </div>
             )}
           </div>
+
+          {/* Footer hint bar */}
+          <div className="flex items-center justify-center gap-4 border-t border-slate-100 bg-slate-50 px-4 py-2">
+            {[
+              { keys: ['↑', '↓'], label: 'navigate' },
+              { keys: ['↵'], label: 'open' },
+              { keys: ['Esc'], label: 'close' },
+            ].map(({ keys, label }) => (
+              <span key={label} className="flex items-center gap-1 text-[11px] text-slate-400">
+                {keys.map(k => <kbd key={k} className="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-bold shadow-sm">{k}</kbd>)}
+                <span>{label}</span>
+              </span>
+            ))}
+          </div>
         </div>
-        <p className="mt-2 text-center text-[11px] font-semibold text-slate-600">
-          <span className="rounded bg-white/60 px-1.5 py-0.5">↑</span>
-          <span className="rounded bg-white/60 px-1.5 py-0.5">↓</span> navigate ·{' '}
-          <span className="rounded bg-white/60 px-1.5 py-0.5">Enter</span> open ·{' '}
-          <span className="rounded bg-white/60 px-1.5 py-0.5">Esc</span> close · open anywhere with{' '}
-          <span className="rounded bg-white/60 px-1.5 py-0.5">Ctrl</span>+
-          <span className="rounded bg-white/60 px-1.5 py-0.5">K</span> (
-          <span className="rounded bg-white/60 px-1.5 py-0.5">⌘</span>+
-          <span className="rounded bg-white/60 px-1.5 py-0.5">K</span> on macOS)
-        </p>
       </div>
     </>
   );

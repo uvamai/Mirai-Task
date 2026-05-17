@@ -24,6 +24,7 @@ import { TaskRelation } from './TaskRelation';
 import { ImportJob } from './ImportJob';
 import { Document } from './Document';
 import { Form } from './Form';
+import { TenantIntegration } from './TenantIntegration';
 
 User.hasMany(TenantMembership, { foreignKey: 'userId' });
 TenantMembership.belongsTo(User, { foreignKey: 'userId' });
@@ -39,6 +40,9 @@ TenantSubscription.belongsTo(SubscriptionPlan, { foreignKey: 'planId' });
 
 Tenant.hasOne(TenantUsage, { foreignKey: 'tenantId' });
 TenantUsage.belongsTo(Tenant, { foreignKey: 'tenantId' });
+
+Tenant.hasMany(TenantIntegration, { foreignKey: 'tenantId' });
+TenantIntegration.belongsTo(Tenant, { foreignKey: 'tenantId' });
 
 User.hasMany(RefreshToken, { foreignKey: 'userId' });
 RefreshToken.belongsTo(User, { foreignKey: 'userId' });
@@ -173,4 +177,5 @@ export {
   ImportJob,
   Document,
   Form,
+  TenantIntegration,
 };

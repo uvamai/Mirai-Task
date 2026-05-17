@@ -1,15 +1,15 @@
-import { Link, NavLink, Outlet, useParams, useLocation } from 'react-router-dom';
+import { Outlet, useParams, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiJson } from '../api/client';
 import { useEffect, useMemo, useState } from 'react';
 import { CreateBoardModal } from './CreateBoardModal';
 import { ImportExcelModal } from './ImportExcelModal';
-import { ProjectHeader } from '../components/project/ProjectHeader';
 import { ProjectTabs } from '../components/project/ProjectTabs';
 import { BoardSwitcher } from '../components/project/BoardSwitcher';
 import { useRecentNavigation } from '../hooks/useRecentNavigation';
 import { boardShellAppPath, parseBoardIdFromProjectPath, shellViewFromPathname, setBoardShellView } from '../hooks/useBoardShellView';
-import { ViewsModal } from '../components/project/ViewsModal';
+import { ProjectGeneratorModal } from '../features/projects/ProjectGeneratorModal';
+import { Star, MoreHorizontal, Share2, Sparkles, Zap, FileSpreadsheet } from 'lucide-react';
 
 type ProjectRow = {
   id: string;
@@ -27,8 +27,8 @@ export function ProjectLayout() {
   const qc = useQueryClient();
   const [createBoardOpen, setCreateBoardOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
   const { push: pushRecent } = useRecentNavigation();
-  const [viewsModalOpen, setViewsModalOpen] = useState(false);
 
   const meQ = useQuery({
     queryKey: ['me-project-layout'],
@@ -47,9 +47,9 @@ export function ProjectLayout() {
     Boolean(projectId) && pq.isSuccess && !pq.isFetching && project === undefined;
   const role = meQ.data?.membership.role ?? '';
   const canManage = ['ADMIN', 'MANAGER'].includes(role);
-  const isAdmin = role === 'ADMIN';
   const defaultBoardId = boards[0]?.id;
   const activeBoardId = routeBoardId ?? defaultBoardId;
+  const workspaceName = meQ.data?.tenant?.name ?? 'Workspace';
 
   useEffect(() => {
     if (!routeBoardId) return;
@@ -57,67 +57,64 @@ export function ProjectLayout() {
     if (inferred) setBoardShellView(routeBoardId, inferred);
   }, [routeBoardId, location.pathname]);
 
-  /**
-   * M7/M8 — Record the current board into Cmd/Ctrl+K palette recents whenever
-   * the user lands on a board route. Empty boards (no boardId in URL) and
-   * unknown boards are skipped.
-   */
   useEffect(() => {
-    if (!projectId || !routeBoardId || !project) return;
-    const found = boards.find((b) => b.id === routeBoardId);
-    if (!found) return;
+    if (!projectId || !project) return;
+    
+    // Always push the project as a recent link
     pushRecent({
-      key: `b:${routeBoardId}`,
-      label: `${project.name} · ${found.name}`,
-      to: boardShellAppPath(projectId, routeBoardId),
-      hint: 'Board',
+      key: `p:${projectId}`,
+      label: project.name,
+      to: `/app/projects/${projectId}`,
+      hint: 'Project',
     });
+
+    if (routeBoardId) {
+      const found = boards.find((b) => b.id === routeBoardId);
+      if (found) {
+        pushRecent({
+          key: `b:${routeBoardId}`,
+          label: `${project.name} · ${found.name}`,
+          to: boardShellAppPath(projectId, routeBoardId),
+          hint: 'Board',
+        });
+      }
+    }
   }, [projectId, routeBoardId, project, boards, pushRecent, location.pathname]);
 
   return (
-    <div className="space-y-0">
+    <div className="flex flex-col h-full w-full">
       {projectMissing && (
-        <div
-          className="mx-auto mb-4 max-w-6xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
-          role="alert"
-        >
+        <div className="m-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950" role="alert">
           <p className="font-semibold">This project is not in your current workspace.</p>
           <p className="mt-1 text-amber-900/90">
-            You are signed into <strong>{meQ.data?.tenant?.name ?? 'an organization'}</strong>
-            {meQ.data?.tenant?.id ? (
-              <>
-                {' '}
-                (<span className="font-mono text-xs">{meQ.data.tenant.id}</span>)
-              </>
-            ) : null}
-            . The UVAMAI project lives under a different organization if your account has more than one.
-          </p>
-          <p className="mt-2">
-            <strong>Fix:</strong> sign out, then sign in again and choose the correct workspace. If you use multiple
-            tenants, open{' '}
-            <Link className="font-semibold text-indigo-800 underline" to="/login">
-              Sign in
-            </Link>{' '}
-            with{' '}
-            <code className="rounded bg-white/80 px-1 py-0.5 text-xs">
-              ?tenantId=&lt;workspace-uuid&gt;
-            </code>{' '}
-            (see docs) or ask an admin to add you to this project.
+            You are signed into <strong>{workspaceName}</strong>.
           </p>
         </div>
       )}
-      <div className="border-b border-white/50 bg-white/60 px-6 py-4 shadow-sm backdrop-blur-xl">
-        <div className="mx-auto max-w-6xl space-y-3">
-          <ProjectHeader
-            workspaceName={meQ.data?.tenant?.name ?? 'Workspace'}
-            projectId={projectId ?? ''}
-            projectName={project?.name ?? 'Project'}
-            activeBoardId={activeBoardId}
-            isAdmin={isAdmin}
-          />
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <ProjectTabs projectId={projectId ?? ''} activeBoardId={activeBoardId} />
+
+      {/* Project Header Area */}
+      <div className="bg-white border-b border-slate-200 pt-4 px-6 shrink-0">
+        <div className="flex flex-col gap-4">
+          
+          {/* Top Row: Breadcrumb & Favorites */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <div className="flex items-center gap-2 text-slate-500">
+                <div className="w-5 h-5 rounded bg-indigo-100 flex items-center justify-center text-indigo-700">
+                  {workspaceName.charAt(0)}
+                </div>
+                <span>{workspaceName}</span>
+                <span>/</span>
+              </div>
+              <h1 className="text-slate-900 font-bold flex items-center gap-2 text-lg">
+                {project?.name ?? 'Project'}
+                <button className="text-slate-300 hover:text-amber-400 transition ml-1">
+                  <Star size={16} />
+                </button>
+              </h1>
+            </div>
+
+            <div className="flex items-center gap-2">
               {boards.length > 0 && projectId && (
                 <BoardSwitcher
                   projectId={projectId}
@@ -129,64 +126,43 @@ export function ProjectLayout() {
                 />
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setViewsModalOpen(true)}
-                className="rounded-xl border border-indigo-200 bg-indigo-50/50 px-3 py-2 text-sm font-bold text-indigo-700 hover:bg-indigo-50 shadow-sm"
-              >
-                Views
-              </button>
+          </div>
+
+          {/* Bottom Row: Tabs & Actions */}
+          <div className="flex items-end justify-between w-full">
+            <div className="flex-1 flex overflow-x-auto no-scrollbar">
+              <ProjectTabs projectId={projectId ?? ''} activeBoardId={activeBoardId} />
+            </div>
+
+            <div className="flex items-center gap-2 pb-2 pl-4">
               {canManage && (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => setCreateBoardOpen(true)}
-                    className="rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-white"
-                  >
-                    + Board
+                  <button onClick={() => setImportOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-md transition border border-transparent">
+                    <FileSpreadsheet size={14} /> Import
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setImportOpen(true)}
-                    className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-800 hover:bg-indigo-100"
-                    title="Create a new board from an Excel/CSV file"
-                  >
-                    Import from Excel
+                  <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-md transition border border-transparent">
+                    <Zap size={14} /> Automate
+                  </button>
+                  <button onClick={() => setAiOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm hover:opacity-90 rounded-md transition">
+                    <Sparkles size={14} /> Ask AI
                   </button>
                 </>
               )}
-              {isAdmin && (
-                <NavLink
-                  to={`/app/projects/${projectId}/settings`}
-                  className={({ isActive }) =>
-                    `rounded-xl px-3 py-2 text-sm font-semibold ${
-                      isActive ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white/80 text-slate-700 hover:bg-white'
-                    }`
-                  }
-                >
-                  Intake
-                </NavLink>
-              )}
-              <NavLink
-                to={`/app/projects/${projectId}/reports${routeBoardId ? `?boardId=${encodeURIComponent(routeBoardId)}` : ''}`}
-                className={({ isActive }) =>
-                  `rounded-xl px-3 py-2 text-sm font-semibold ${
-                    isActive ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white/80 text-slate-700 hover:bg-white'
-                  }`
-                }
-              >
-                Reports
-              </NavLink>
+              <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-md transition border border-transparent">
+                <Share2 size={14} /> Share
+              </button>
+              <button className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-md transition">
+                <MoreHorizontal size={16} />
+              </button>
             </div>
           </div>
+
         </div>
       </div>
 
-      <div className="px-6 py-6">
-        <div className="mx-auto max-w-6xl">
-          <Outlet />
-        </div>
+      {/* Main Content Area - Full Width/Height */}
+      <div className="flex-1 overflow-auto bg-slate-50 relative">
+        <Outlet />
       </div>
 
       {projectId && (
@@ -205,16 +181,12 @@ export function ProjectLayout() {
               void qc.invalidateQueries({ queryKey: ['projects'] });
             }}
           />
+          <ProjectGeneratorModal
+            projectId={projectId}
+            open={aiOpen}
+            onClose={() => setAiOpen(false)}
+          />
         </>
-      )}
-
-      {projectId && (
-        <ViewsModal
-          projectId={projectId}
-          boardId={boardId}
-          open={viewsModalOpen}
-          onClose={() => setViewsModalOpen(false)}
-        />
       )}
     </div>
   );

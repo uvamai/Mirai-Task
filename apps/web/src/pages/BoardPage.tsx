@@ -85,11 +85,24 @@ function SortableTaskCard({
   };
   const paused =
     task.slaState && typeof task.slaState === 'object' && 'paused' in task.slaState && (task.slaState as { paused?: boolean }).paused;
-  const overdue =
+  const slaOverdue =
     task.slaDeadline &&
     !paused &&
     task.status !== 'Done' &&
     new Date(task.slaDeadline).getTime() < Date.now();
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const dueDateStr = task.dueDate ? String(task.dueDate).slice(0, 10) : null;
+  const dueDateOverdue = dueDateStr && dueDateStr < todayStr && task.status !== 'Done';
+  const dueDateToday = dueDateStr && dueDateStr === todayStr && task.status !== 'Done';
+  const overdue = slaOverdue || dueDateOverdue;
+
+  // Priority ring styling
+  const priorityRing =
+    task.priority === 'P0' ? 'ring-2 ring-red-400 shadow-[0_0_0_3px_rgba(239,68,68,0.2)]' :
+    task.priority === 'P1' ? 'ring-1 ring-orange-300' :
+    overdue ? 'ring-1 ring-rose-300' :
+    'ring-1 ring-slate-200/60';
 
   return (
     <div
@@ -99,9 +112,10 @@ function SortableTaskCard({
       data-testid="board-card"
       data-task-key={task.key}
       data-task-status={task.status}
-      className={`glass-card flex gap-1 rounded-xl px-2 ring-1 transition ${
+      data-priority={task.priority}
+      className={`glass-card flex gap-1 rounded-xl px-2 transition ${
         dense ? 'py-1.5' : 'py-2'
-      } ${overdue ? 'border-rose-300 ring-rose-200/80' : 'border-white/60 ring-slate-200/40'}`}
+      } ${overdue ? 'border-rose-200 bg-rose-50/30' : 'border-white/60'} ${priorityRing}`}
     >
       <button
         type="button"
@@ -114,8 +128,19 @@ function SortableTaskCard({
       </button>
       <button type="button" className="min-w-0 flex-1 text-left" onClick={() => onOpen(task.id)}>
         <div className="flex flex-wrap items-center gap-1">
+          {task.type && task.type !== 'task' && (
+            <Badge tone="indigo">{task.type}</Badge>
+          )}
           {fieldShow.key && <span className="text-xs font-semibold text-indigo-700">{task.key}</span>}
-          {fieldShow.priority && <Badge tone="indigo">{task.priority}</Badge>}
+          {fieldShow.priority && (
+            <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+              task.priority === 'P0' ? 'bg-red-100 text-red-700' :
+              task.priority === 'P1' ? 'bg-orange-100 text-orange-700' :
+              task.priority === 'P2' ? 'bg-amber-100 text-amber-700' :
+              task.priority === 'P3' ? 'bg-blue-100 text-blue-700' :
+              'bg-slate-100 text-slate-600'
+            }`}>{task.priority}</span>
+          )}
           {fieldShow.estimate && task.estimate != null && (
             <Badge tone="default">
               {task.estimate} {estimateUnit}
@@ -145,8 +170,12 @@ function SortableTaskCard({
           )}
         </div>
         {fieldShow.dueDate && task.dueDate && (
-          <div className="mt-0.5 text-[10px] font-medium text-slate-500">
-            Due {typeof task.dueDate === 'string' ? task.dueDate.slice(0, 10) : String(task.dueDate).slice(0, 10)}
+          <div className={`mt-0.5 flex items-center gap-1 text-[10px] font-semibold ${
+            dueDateOverdue ? 'text-rose-600' : dueDateToday ? 'text-amber-600' : 'text-slate-400'
+          }`}>
+            {dueDateOverdue && <span>⚠</span>}
+            {dueDateToday && <span>●</span>}
+            Due {dueDateStr}
           </div>
         )}
       </button>
@@ -172,11 +201,13 @@ function BoardColumn({
   col,
   widthPx,
   onResizeRightEdge,
+  onAddTask,
   children,
 }: {
   col: string;
   widthPx: number;
   onResizeRightEdge: (e: React.MouseEvent) => void;
+  onAddTask?: (status: string) => void;
   children: ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: col });
@@ -193,7 +224,17 @@ function BoardColumn({
         }`}
       >
         <h3 className="shrink-0 text-xs font-bold uppercase tracking-wide text-slate-600">{col}</h3>
-        <div className="min-h-[120px] max-h-[min(68vh,600px)] flex-1 overflow-y-auto overflow-x-hidden pr-0.5">{children}</div>
+        <div className="min-h-[120px] max-h-[min(68vh,600px)] flex-1 overflow-y-auto overflow-x-hidden pr-0.5">
+          {children}
+          {onAddTask && (
+            <button
+              onClick={() => onAddTask(col)}
+              className="mt-2 w-full rounded-lg border border-transparent py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+            >
+              + Add Task
+            </button>
+          )}
+        </div>
       </div>
       <button
         type="button"
@@ -229,11 +270,15 @@ function BoardRecurringPanel({
   boardId,
   columns,
   canManage,
+  open,
+  onClose,
 }: {
   projectId: string;
   boardId: string;
   columns: string[];
   canManage: boolean;
+  open: boolean;
+  onClose: () => void;
 }) {
   const qc = useQueryClient();
   const [title, setTitle] = useState('Recurring checklist');
@@ -284,24 +329,23 @@ function BoardRecurringPanel({
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['recurring-rules', projectId, boardId] }),
   });
 
-  if (!canManage) return null;
+  if (!canManage || !open) return null;
 
   return (
-    <details className="rounded-2xl border border-white/50 bg-white/45 shadow-sm backdrop-blur-md">
-      <summary className="cursor-pointer select-none list-none px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-bold text-slate-800">Recurring tasks</h2>
-            <p className="mt-0.5 text-xs text-slate-600">
-              Schedule repeating operational work. (Creates a task on each run.)
-            </p>
-          </div>
-          <span className="rounded-lg bg-white/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600 ring-1 ring-slate-200">
-            Configure
-          </span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/50 bg-white/95 p-6 shadow-2xl"
+      >
+        <div className="flex items-start justify-between mb-4">
+          <h2 className="text-lg font-bold text-slate-900">Recurring tasks</h2>
+          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">✕</button>
         </div>
-      </summary>
-      <div className="border-t border-white/60 px-4 pb-4">
+      <div className="w-[500px] max-w-full space-y-4">
+        <p className="text-sm text-slate-600">
+          Schedule repeating operational work. (Creates a task on each run.)
+        </p>
       <div className="mt-3 flex flex-wrap items-end gap-2">
         <label className="flex min-w-[140px] flex-1 flex-col text-[10px] font-semibold uppercase text-slate-500">
           Title
@@ -403,7 +447,8 @@ function BoardRecurringPanel({
         ))}
       </ul>
       </div>
-    </details>
+      </div>
+    </div>
   );
 }
 
@@ -969,7 +1014,70 @@ export function BoardPage() {
         </div>
       )}
 
-      <BoardRecurringPanel projectId={projectId} boardId={boardId} columns={columns} canManage={canManageBoard} />
+      {searchParams.has('search') && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/50 bg-white/95 p-6 shadow-2xl"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <h2 className="text-lg font-bold text-slate-900">Search tasks</h2>
+              <button 
+                onClick={() => {
+                  setSearchParams((prev) => {
+                    const n = new URLSearchParams(prev);
+                    n.delete('search');
+                    return n;
+                  }, { replace: true });
+                }} 
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            </div>
+        <div className="w-[500px] max-w-full space-y-4">
+          <input
+            autoFocus
+            value={filters.search}
+            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+            placeholder="Search title or key (MIRAI-…)"
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+          />
+          <div className="flex justify-end pt-2">
+            <button
+              type="button"
+              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+              onClick={() => {
+                setSearchParams((prev) => {
+                  const n = new URLSearchParams(prev);
+                  n.delete('search');
+                  return n;
+                }, { replace: true });
+              }}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+        </div>
+        </div>
+      )}
+
+      <BoardRecurringPanel
+        projectId={projectId}
+        boardId={boardId}
+        columns={columns}
+        canManage={canManageBoard}
+        open={searchParams.has('recurring')}
+        onClose={() => {
+          setSearchParams((prev) => {
+            const n = new URLSearchParams(prev);
+            n.delete('recurring');
+            return n;
+          }, { replace: true });
+        }}
+      />
 
       <TaskCreateModal
         boardId={boardId}
@@ -1051,6 +1159,10 @@ export function BoardPage() {
                     e.preventDefault();
                     startColumnResize(col, e.clientX, w);
                   }}
+                  onAddTask={canCreate ? () => {
+                    // Ideally we'd set default status in modal, but for now just open modal
+                    setCreateOpen(true);
+                  } : undefined}
                 >
                   <SortableContext items={ids} strategy={verticalListSortingStrategy}>
                     {colTasks.map((t) => (

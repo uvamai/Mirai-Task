@@ -25,6 +25,8 @@ import { intakePublicRouter } from './routes/intakePublic';
 import { contactSalesRouter } from './routes/contactSales';
 import { globalAdminRouter } from './routes/globalAdmin';
 import { swaggerSpec } from './swagger';
+import { integrationsRouter } from './routes/integrations';
+import { dashboardRouter } from './routes/dashboard';
 
 export function buildApp(): express.Express {
   const app = express();
@@ -60,15 +62,17 @@ export function buildApp(): express.Express {
   app.use(projectScopedRouter);
   app.use(tenantSettingsRouter);
   app.use(projectsRouter);
+  app.use(dashboardRouter);
   app.use(employeesRouter);
   app.use(invitationsAdminRouter);
   app.use(notificationsRouter);
   app.use(tasksRouter);
   app.use(agentsAdminRouter);
   app.use(agentsApiRouter);
+  app.use(integrationsRouter);
+  app.use(billingRouter);
   app.use(adminRouter);
   app.use(globalAdminRouter);
-  app.use(billingRouter);
 
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

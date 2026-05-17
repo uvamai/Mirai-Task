@@ -75,27 +75,6 @@ export function AppShell() {
     }
   }, [accessToken, storedTenantId, meShell.data?.tenant?.id, meShell.isError, dispatch, qc]);
 
-  // Keep recent links fresh for Recents (board + list + calendar).
-  useEffect(() => {
-    if (!accessToken) return;
-    const href = window.location.pathname;
-    if (!href.startsWith('/app/projects/')) return;
-    try {
-      const raw = localStorage.getItem('mirai_recent_links');
-      const parsed: unknown = raw ? JSON.parse(raw) : [];
-      const list: { label?: unknown; to?: unknown; at?: unknown }[] = Array.isArray(parsed)
-        ? (parsed as { label?: unknown; to?: unknown; at?: unknown }[])
-        : [];
-      const label = href.includes('/boards/') ? 'Board' : 'Project';
-      const last = href.split('/').slice(-1)[0] ?? '';
-      const entry = { label: `${label} · ${last}`, to: href, at: Date.now() };
-      const next = [entry, ...list.filter((x) => x && x.to !== href)].slice(0, 12);
-      localStorage.setItem('mirai_recent_links', JSON.stringify(next));
-    } catch {
-      // ignore
-    }
-  }, [accessToken]);
-
   // Global Cmd/Ctrl+K palette.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {

@@ -1,20 +1,32 @@
-import { Badge } from './ui/Badge';
-import { useTagCatalog, type TagTone } from '../hooks/useTagCatalog';
+
+
+const gradients = [
+  'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-transparent',
+  'bg-gradient-to-r from-purple-500 to-indigo-500 text-white border-transparent',
+  'bg-gradient-to-r from-cyan-500 to-blue-500 text-white border-transparent',
+  'bg-gradient-to-r from-emerald-400 to-teal-500 text-white border-transparent',
+  'bg-gradient-to-r from-amber-400 to-orange-500 text-white border-transparent',
+  'bg-gradient-to-r from-fuchsia-500 to-pink-500 text-white border-transparent',
+  'bg-gradient-to-r from-violet-400 to-fuchsia-400 text-white border-transparent',
+  'bg-gradient-to-r from-blue-400 to-indigo-500 text-white border-transparent',
+];
 
 export function TagPill({ tag }: { tag: string }) {
-  const q = useTagCatalog();
-  const catalog = q.data ?? [];
   const norm = tag.trim().toLowerCase();
-  const fromCatalog = catalog.find((t) => t.name.toLowerCase() === norm);
-  const tone: TagTone =
-    fromCatalog?.tone ??
-    (norm === 'ui/ux improvement' || norm === 'ui ux improvement' || norm === 'ui/ux'
-      ? 'indigo'
-      : norm.includes('incident')
-        ? 'rose'
-        : norm.includes('sla')
-          ? 'amber'
-          : 'default');
-  return <Badge tone={tone}>{tag}</Badge>;
-}
+  
+  // deterministic hash for color picking
+  let hash = 0;
+  for (let i = 0; i < norm.length; i++) {
+    hash = norm.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const colorIndex = Math.abs(hash) % gradients.length;
+  const gradientClass = gradients[colorIndex];
 
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-sm ${gradientClass}`}
+    >
+      {tag}
+    </span>
+  );
+}

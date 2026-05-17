@@ -11,6 +11,7 @@ export type TaskRow = {
   title: string;
   status: string;
   priority: string;
+  type?: string;
   position: number;
   boardId?: string;
   description?: string | null;
@@ -35,6 +36,7 @@ export type ActivityRow = {
   id: string;
   action: string;
   actorType: string;
+  actorUser?: { id: string; firstName: string | null; lastName: string | null; email: string } | null;
   before: unknown;
   after: unknown;
   createdAt: string;

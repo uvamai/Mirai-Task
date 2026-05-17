@@ -19,6 +19,7 @@ export const env = {
   databaseUrl: requireEnv('DATABASE_URL', 'postgres://mirai:mirai@127.0.0.1:15432/mirai_tasker'),
   jwtAccessSecret: requireEnv('JWT_ACCESS_SECRET', 'dev-access-secret-min-32-characters-long'),
   jwtRefreshSecret: requireEnv('JWT_REFRESH_SECRET', 'dev-refresh-secret-min-32-characters-long'),
+  encryptionKey: process.env.ENCRYPTION_KEY,
   accessTtlMin: Number(process.env.ACCESS_TOKEN_TTL_MIN ?? 15),
   refreshTtlDays: Number(process.env.REFRESH_TOKEN_TTL_DAYS ?? 7),
   billingMode: (process.env.BILLING_MODE ?? 'mock') as 'mock' | 'stripe',

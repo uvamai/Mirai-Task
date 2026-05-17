@@ -114,7 +114,7 @@ export function TaskDetailPanel({
 
   const employeesQ = useQuery({
     queryKey: ['employees-picker'],
-    enabled: Boolean(taskId) && canManage,
+    enabled: Boolean(taskId),
     queryFn: () => apiJson<{ employees: EmployeeOption[] }>('/employees'),
   });
 
@@ -236,7 +236,6 @@ export function TaskDetailPanel({
     },
   });
 
-  if (!taskId) return null;
 
   const task = detailQ.data?.task;
   const mode = (task?.estimateMode as 'story_points' | 'hours' | undefined) ?? estimateMode;
@@ -267,6 +266,18 @@ export function TaskDetailPanel({
     const next = tags.filter((x) => x.toLowerCase() !== t.toLowerCase());
     patchTask.mutate({ tags: next });
   }
+
+  const currentAssigneeName = useMemo(() => {
+    if (task?.assigneeType === 'agent') return 'AI Agent';
+    if (task?.assigneeType === 'user' && task.assigneeId && employeesQ.data) {
+      const emp = employeesQ.data.employees.find(e => e.userId === task.assigneeId);
+      if (emp) return `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || emp.email;
+      return 'Unknown user';
+    }
+    return 'Unassigned';
+  }, [task?.assigneeType, task?.assigneeId, employeesQ.data]);
+
+  if (!taskId) return null;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
@@ -306,6 +317,7 @@ export function TaskDetailPanel({
         {detailQ.isError && <p className="text-sm text-rose-700">Could not load task.</p>}
         {task && (
           <div className="space-y-6">
+
             {(task.tags?.length ?? 0) > 0 && (
               <div className="flex flex-wrap gap-1">
                 {task.tags!.map((t) => (
@@ -388,449 +400,596 @@ export function TaskDetailPanel({
               </div>
             )}
 
-            {canEditFields ? (
-              <Formik
-                enableReinitialize
-                initialValues={{
-                  title: task.title,
-                  description: task.description ?? '',
-                  priority: task.priority,
-                  status: task.status,
-                  estimate: task.estimate ?? ('' as const),
-                  resolution: task.resolution ?? '',
-                  dueDate: task.dueDate ? String(task.dueDate).slice(0, 10) : '',
-                  parentTaskId: task.parentTaskId ?? '',
-                  dependenciesText: (task.dependencies ?? []).join(', '),
-                  metadata: {
-                    ...(Object.fromEntries(
-                      defs.map((d) => {
-                        const cur = task.metadata?.[d.key];
-                        if (d.type === 'number') return [d.key, cur === null || cur === undefined ? '' : String(cur)];
-                        return [d.key, cur == null ? '' : String(cur)];
-                      })
-                    ) as Record<string, string>),
-                    itsmMajorIncidentId:
-                      task.metadata?.itsmMajorIncidentId != null ? String(task.metadata.itsmMajorIncidentId) : '',
-                    itsmProblemId: task.metadata?.itsmProblemId != null ? String(task.metadata.itsmProblemId) : '',
-                    changeWindowStart: isoToDatetimeLocal(task.metadata?.changeWindowStart),
-                    changeWindowEnd: isoToDatetimeLocal(task.metadata?.changeWindowEnd),
-                  },
-                }}
-                validationSchema={Yup.object({
-                  title: Yup.string().min(1).max(512).required(),
-                  description: Yup.string().max(8000).nullable(),
-                  priority: Yup.string().oneOf(['P0', 'P1', 'P2', 'P3', 'P4']).required(),
-                  status: Yup.string().required(),
-                  estimate: estimateSchema(mode),
-                  resolution: Yup.string().max(8000).nullable(),
-                  dueDate: Yup.string().nullable(),
-                  parentTaskId: Yup.string()
-                    .nullable()
-                    .transform((v) => (v === '' || v === undefined ? '' : String(v).trim()))
-                    .test('uuid', 'Invalid parent UUID', (v) => !v || UUID_RE.test(v)),
-                  dependenciesText: Yup.string().max(4000).nullable(),
-                  metadata: Yup.object({
-                    ...Object.fromEntries(
-                      defs.map((d) => {
-                        if (d.type === 'text') return [d.key, Yup.string().max(2000).nullable()];
-                        if (d.type === 'number')
-                          return [
-                            d.key,
-                            Yup.number().nullable().transform((v, orig) => (orig === '' ? null : v)),
-                          ];
-                        const opts = [...(d.options ?? []), '', null] as (string | null)[];
-                        return [d.key, Yup.string().nullable().oneOf(opts)];
-                      })
-                    ),
-                    itsmMajorIncidentId: Yup.string()
-                      .nullable()
-                      .transform((v) => (v === '' ? '' : v))
-                      .test('uuid', 'Invalid UUID', (v) => !v || UUID_RE.test(v)),
-                    itsmProblemId: Yup.string()
-                      .nullable()
-                      .transform((v) => (v === '' ? '' : v))
-                      .test('uuid', 'Invalid UUID', (v) => !v || UUID_RE.test(v)),
-                    changeWindowStart: Yup.string().nullable(),
-                    changeWindowEnd: Yup.string().nullable(),
-                  }),
-                })}
-                onSubmit={async (values, { setStatus }) => {
-                  setStatus(undefined);
-                  if (!canEditP0 && values.priority === 'P0' && task.priority !== 'P0') {
-                    setStatus('Only Admin/Manager can set P0');
-                    return;
-                  }
-                  const metaOut: Record<string, unknown> = { ...(task.metadata ?? {}) };
-                  const md = values.metadata as Record<string, string | number | undefined>;
-                  for (const d of defs) {
-                    const raw = md[d.key];
-                    if (d.type === 'number') {
-                      metaOut[d.key] = raw === '' || raw === undefined ? null : Number(raw);
-                    } else {
-                      metaOut[d.key] = raw === '' ? null : raw;
-                    }
-                  }
-                  const mi = String(md.itsmMajorIncidentId ?? '').trim();
-                  metaOut.itsmMajorIncidentId = mi && UUID_RE.test(mi) ? mi : null;
-                  const pr = String(md.itsmProblemId ?? '').trim();
-                  metaOut.itsmProblemId = pr && UUID_RE.test(pr) ? pr : null;
-                  const cws = String(md.changeWindowStart ?? '').trim();
-                  const cwe = String(md.changeWindowEnd ?? '').trim();
-                  metaOut.changeWindowStart = cws ? new Date(cws).toISOString() : null;
-                  metaOut.changeWindowEnd = cwe ? new Date(cwe).toISOString() : null;
-                  const due =
-                    values.dueDate && String(values.dueDate).trim() !== ''
-                      ? String(values.dueDate).slice(0, 10)
-                      : null;
-                  const ptRaw = String(values.parentTaskId ?? '').trim();
-                  const nextParent = ptRaw === '' ? null : ptRaw;
-                  const prevParent = task.parentTaskId ?? null;
-                  try {
-                    const body: Record<string, unknown> = {
-                      title: values.title,
-                      description: values.description || null,
-                      priority: values.priority,
-                      status: values.status,
-                      estimate: values.estimate === '' ? null : Number(values.estimate),
-                      resolution: values.resolution?.trim() ? values.resolution.trim() : null,
-                      dueDate: due,
-                      dependencies: parseDepIds(values.dependenciesText ?? ''),
-                      metadata: metaOut,
-                    };
-                    if (prevParent !== nextParent) {
-                      body.parentTaskId = nextParent;
-                    }
-                    await patchTask.mutateAsync(body);
-                  } catch (e) {
-                    setStatus((e as Error).message);
-                  }
-                }}
-              >
-                {({ isSubmitting, status }) => (
-                  <Form className="space-y-3">
-                    <div>
-                      <label className="text-xs font-semibold text-slate-600">Parent task ID (optional)</label>
-                      <Field
-                        name="parentTaskId"
-                        placeholder="UUID of parent in this project, empty to clear"
-                        className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 font-mono text-xs"
-                      />
-                      <ErrorMessage name="parentTaskId" component="p" className="text-xs text-rose-600" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-600">Title</label>
-                      <Field name="title" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
-                      <ErrorMessage name="title" component="p" className="text-xs text-rose-600" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-600">Description</label>
-                      <Field as="textarea" name="description" rows={3} className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                      <div>
-                        <label className="text-xs font-semibold text-slate-600">Priority</label>
-                        <Field as="select" name="priority" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm">
-                          {(['P0', 'P1', 'P2', 'P3', 'P4'] as const).map((p) => (
-                            <option key={p} value={p} disabled={!canEditP0 && p === 'P0'}>
-                              {p}
-                            </option>
-                          ))}
-                        </Field>
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold text-slate-600">Status</label>
-                        <Field as="select" name="status" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm">
-                          {wfCols.map((c) => (
-                            <option key={c} value={c}>
-                              {c}
-                            </option>
-                          ))}
-                        </Field>
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold text-slate-600">{estLabel}</label>
-                        <Field
-                          name="estimate"
-                          type="number"
-                          step={mode === 'hours' ? '0.5' : '1'}
-                          className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
-                        />
-                        <ErrorMessage name="estimate" component="p" className="text-xs text-rose-600" />
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold text-slate-600">Due date</label>
-                        <Field name="dueDate" type="date" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-600">Resolution (when Done)</label>
-                      <Field name="resolution" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-600">Dependencies (task UUIDs, comma-separated)</label>
-                      <Field
-                        name="dependenciesText"
-                        as="textarea"
-                        rows={2}
-                        className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 font-mono text-xs"
-                      />
-                    </div>
-                    <div className="space-y-2 rounded-lg border border-slate-100 bg-slate-50/80 p-2">
-                      <p className="text-[10px] font-bold uppercase text-slate-500">ITSM links</p>
-                      <div>
-                        <label className="text-xs font-semibold text-slate-600">Major incident task UUID</label>
-                        <Field
-                          name="metadata.itsmMajorIncidentId"
-                          placeholder="Optional UUID"
-                          className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 font-mono text-xs"
-                        />
-                        <ErrorMessage name="metadata.itsmMajorIncidentId" component="p" className="text-xs text-rose-600" />
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold text-slate-600">Problem task UUID</label>
-                        <Field
-                          name="metadata.itsmProblemId"
-                          placeholder="Optional UUID"
-                          className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 font-mono text-xs"
-                        />
-                        <ErrorMessage name="metadata.itsmProblemId" component="p" className="text-xs text-rose-600" />
-                      </div>
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <div>
-                          <label className="text-xs font-semibold text-slate-600">Change window start</label>
-                          <Field name="metadata.changeWindowStart" type="datetime-local" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" />
-                        </div>
-                        <div>
-                          <label className="text-xs font-semibold text-slate-600">Change window end</label>
-                          <Field name="metadata.changeWindowEnd" type="datetime-local" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" />
-                        </div>
-                      </div>
-                    </div>
-                    {defs.length > 0 && (
-                      <div className="space-y-2 rounded-lg border border-slate-100 bg-slate-50/80 p-2">
-                        <p className="text-[10px] font-bold uppercase text-slate-500">Custom fields</p>
-                        {defs.map((d) => (
-                          <div key={d.key}>
-                            <label className="text-xs font-semibold text-slate-600">{d.label}</label>
-                            {d.type === 'select' ? (
-                              <Field as="select" name={`metadata.${d.key}`} className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm">
-                                <option value="">—</option>
-                                {(d.options ?? []).map((o) => (
-                                  <option key={o} value={o}>
-                                    {o}
-                                  </option>
-                                ))}
-                              </Field>
-                            ) : (
-                              <Field
-                                name={`metadata.${d.key}`}
-                                type={d.type === 'number' ? 'number' : 'text'}
-                                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
-                              />
-                            )}
-                          </div>
+            {(() => {
+              const assigneeControlsBlock = (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 mt-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600">Current Assignee *</label>
+                    {canManage && employeesQ.data ? (
+                      <select
+                        id="assign-user-inline"
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm shadow-sm bg-white"
+                        value={task.assigneeType === 'user' ? (task.assigneeId || '') : ''}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (!v) return;
+                          assignTask.mutate({ assigneeType: 'user', assigneeId: v });
+                        }}
+                      >
+                        <option value="" disabled>Assign to user…</option>
+                        {employeesQ.data.employees.map((emp) => (
+                          <option key={emp.userId} value={emp.userId}>
+                            {emp.firstName} {emp.lastName} ({emp.email})
+                          </option>
                         ))}
+                      </select>
+                    ) : (
+                      <div className="mt-1 w-full rounded-lg border border-transparent px-2 py-1.5 text-sm bg-slate-50">
+                        {currentAssigneeName}
                       </div>
                     )}
-                    {status && <p className="text-xs text-rose-700">{status}</p>}
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="w-full rounded-xl bg-slate-900 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                    >
-                      Save changes
-                    </button>
-                  </Form>
-                )}
-              </Formik>
-            ) : (
-              <div className="text-sm text-slate-700">
-                <p className="font-semibold">{task.title}</p>
-                <p className="mt-2 whitespace-pre-wrap text-slate-600">{task.description || '—'}</p>
-                <p className="mt-2 text-xs text-slate-500">
-                  Due: {task.dueDate ? String(task.dueDate).slice(0, 10) : '—'} · Dependencies:{' '}
-                  {(task.dependencies?.length ?? 0) > 0 ? task.dependencies!.length : '—'}
-                </p>
-                {task.resolution && <p className="mt-1 text-xs text-slate-600">Resolution: {task.resolution}</p>}
-              </div>
-            )}
-
-            <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-700">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-semibold text-slate-800">SLA</span>
-                <SlaCountdown slaDeadline={task.slaDeadline} paused={Boolean(paused)} />
-              </div>
-              <p className="mt-1 text-[11px] text-slate-500">
-                Deadline: {task.slaDeadline ? new Date(task.slaDeadline).toLocaleString() : '—'}
-              </p>
-              {paused && <p className="mt-1 text-amber-700">Paused</p>}
-              {task.slaState &&
-                typeof task.slaState === 'object' &&
-                'blockedReason' in task.slaState &&
-                (task.slaState as { blockedReason?: string }).blockedReason && (
-                  <p className="mt-1 text-xs text-rose-800">
-                    Blocked: {(task.slaState as { blockedReason: string }).blockedReason}
-                  </p>
-                )}
-            </div>
-
-            <div className="border-t border-slate-200 pt-4">
-              <h3 className="text-xs font-bold uppercase text-slate-600">Related work</h3>
-              <p className="mt-1 text-[11px] text-slate-500">
-                Linked tasks in this project (separate from blocking dependencies in the edit form).
-              </p>
-              {relatedQ.isLoading ? (
-                <p className="mt-2 text-xs text-slate-500">Loading links…</p>
-              ) : relatedQ.isError ? (
-                <p className="mt-2 text-xs text-rose-600">Could not load related tasks.</p>
-              ) : (
-                <ul className="mt-2 space-y-1">
-                  {(relatedQ.data?.related ?? []).length === 0 ? (
-                    <li className="text-xs text-slate-500">No linked tasks yet.</li>
-                  ) : (
-                    (relatedQ.data?.related ?? []).map((r) => (
-                      <li
-                        key={r.id}
-                        className="flex items-start justify-between gap-2 rounded-lg bg-slate-50 px-2 py-1.5 text-xs"
-                      >
-                        <div className="min-w-0">
-                          {projectId && r.boardId ? (
-                            <Link
-                              to={`/app/projects/${projectId}/boards/${r.boardId}?task=${encodeURIComponent(r.id)}`}
-                              className="font-semibold text-indigo-700 hover:text-indigo-900"
-                              onClick={() => onClose()}
-                            >
-                              {r.key}
-                            </Link>
-                          ) : (
-                            <span className="font-semibold text-slate-800">{r.key}</span>
-                          )}
-                          <span className="text-slate-600"> · {r.status}</span>
-                          <div className="truncate text-slate-600">{r.title}</div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600">Reassign (requires reason)</label>
+                    <div className="mt-1">
+                      {canManage && employeesQ.data ? (
+                        <ReassignForm
+                          employees={employeesQ.data.employees}
+                          onSubmit={(toId, reason) => reassignTask.mutate({ toType: 'user', toId, reason })}
+                          disabled={reassignTask.isPending}
+                        />
+                      ) : (
+                        <div className="w-full rounded-lg border border-transparent px-2 py-1.5 text-sm text-slate-400 bg-slate-50">
+                          Not permitted
                         </div>
-                        {canEditRelated && (
-                          <button
-                            type="button"
-                            className="shrink-0 rounded p-0.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                            disabled={removeRelatedTask.isPending}
-                            aria-label={`Remove link to ${r.key}`}
-                            onClick={() => removeRelatedTask.mutate(r.id)}
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+
+              const commentsBlock = <TaskCommentsSection taskId={taskId} boardId={boardId} />;
+              
+              const relatedWorkBlock = (
+                <div className="border-t border-slate-200 pt-4">
+                  <h3 className="text-xs font-bold uppercase text-slate-600">Related work</h3>
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Linked tasks in this project (separate from blocking dependencies in the edit form).
+                  </p>
+                  {relatedQ.isLoading ? (
+                    <p className="mt-2 text-xs text-slate-500">Loading links…</p>
+                  ) : relatedQ.isError ? (
+                    <p className="mt-2 text-xs text-rose-600">Could not load related tasks.</p>
+                  ) : (
+                    <ul className="mt-2 space-y-1">
+                      {(relatedQ.data?.related ?? []).length === 0 ? (
+                        <li className="text-xs text-slate-500">No linked tasks yet.</li>
+                      ) : (
+                        (relatedQ.data?.related ?? []).map((r) => (
+                          <li
+                            key={r.id}
+                            className="flex items-start justify-between gap-2 rounded-lg bg-slate-50 px-2 py-1.5 text-xs"
                           >
-                            ✕
-                          </button>
-                        )}
-                      </li>
-                    ))
+                            <div className="min-w-0">
+                              {projectId && r.boardId ? (
+                                <Link
+                                  to={`/app/projects/${projectId}/boards/${r.boardId}?task=${encodeURIComponent(r.id)}`}
+                                  className="font-semibold text-indigo-700 hover:text-indigo-900"
+                                  onClick={() => onClose()}
+                                >
+                                  {r.key}
+                                </Link>
+                              ) : (
+                                <span className="font-semibold text-slate-800">{r.key}</span>
+                              )}
+                              <span className="text-slate-600"> · {r.status}</span>
+                              <div className="truncate text-slate-600">{r.title}</div>
+                            </div>
+                            {canEditRelated && (
+                              <button
+                                type="button"
+                                className="shrink-0 rounded p-0.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                                disabled={removeRelatedTask.isPending}
+                                aria-label={`Remove link to ${r.key}`}
+                                onClick={() => removeRelatedTask.mutate(r.id)}
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </li>
+                        ))
+                      )}
+                    </ul>
                   )}
-                </ul>
-              )}
-              {canEditRelated && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <input
-                    type="text"
-                    value={relatedUuid}
-                    onChange={(e) => {
-                      setRelatedUuid(e.target.value);
-                      setRelatedErr(null);
-                    }}
-                    placeholder="Other task UUID (same project)"
-                    className="min-w-[12rem] flex-1 rounded-lg border border-slate-200 px-2 py-1.5 font-mono text-xs"
-                  />
-                  <button
-                    type="button"
-                    disabled={addRelatedTask.isPending || !UUID_RE.test(relatedUuid.trim())}
-                    onClick={() => {
-                      const id = relatedUuid.trim();
-                      addRelatedTask.mutate(id, {
-                        onSuccess: () => {
-                          setRelatedUuid('');
+                  {canEditRelated && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <input
+                        type="text"
+                        value={relatedUuid}
+                        onChange={(e) => {
+                          setRelatedUuid(e.target.value);
                           setRelatedErr(null);
-                        },
-                        onError: (e) => setRelatedErr((e as Error).message),
-                      });
-                    }}
-                    className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-                  >
-                    Link task
-                  </button>
+                        }}
+                        placeholder="Other task UUID (same project)"
+                        className="min-w-[12rem] flex-1 rounded-lg border border-slate-200 px-2 py-1.5 font-mono text-xs"
+                      />
+                      <button
+                        type="button"
+                        disabled={addRelatedTask.isPending || !UUID_RE.test(relatedUuid.trim())}
+                        onClick={() => {
+                          const id = relatedUuid.trim();
+                          addRelatedTask.mutate(id, {
+                            onSuccess: () => {
+                              setRelatedUuid('');
+                              setRelatedErr(null);
+                            },
+                            onError: (e) => setRelatedErr((e as Error).message),
+                          });
+                        }}
+                        className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                      >
+                        Link task
+                      </button>
+                    </div>
+                  )}
+                  {relatedErr && <p className="mt-2 text-xs text-rose-600">{relatedErr}</p>}
                 </div>
-              )}
-              {relatedErr && <p className="mt-2 text-xs text-rose-600">{relatedErr}</p>}
-            </div>
+              );
 
-            {canManage && employeesQ.data && (
-              <div className="space-y-2 border-t border-slate-200 pt-4">
-                <h3 className="text-xs font-bold uppercase text-slate-600">Assign</h3>
-                <div className="flex flex-wrap gap-2">
-                  <select
-                    id="assign-user"
-                    className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
-                    defaultValue=""
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (!v) return;
-                      assignTask.mutate({ assigneeType: 'user', assigneeId: v });
-                      e.target.value = '';
-                    }}
-                  >
-                    <option value="">Assign to user…</option>
-                    {employeesQ.data.employees.map((emp) => (
-                      <option key={emp.userId} value={emp.userId}>
-                        {emp.firstName} {emp.lastName} ({emp.email})
-                      </option>
+              const activityBlock = (
+                <div className="border-t border-slate-200 pt-4">
+                  <h3 className="text-xs font-bold uppercase text-slate-600">Activity</h3>
+                  <ul className="mt-2 max-h-48 space-y-2 overflow-y-auto text-xs">
+                    {detailQ.data?.activity.map((a) => (
+                      <li key={a.id} className="rounded-lg bg-slate-50 px-2 py-1.5">
+                        <span className="font-semibold text-slate-800">{a.action}</span>
+                        <span className="text-slate-500">
+                          {' '}·{' '}
+                          {a.actorType === 'user' && a.actorUser
+                            ? `${a.actorUser.firstName || ''} ${a.actorUser.lastName || ''}`.trim() || a.actorUser.email
+                            : a.actorType}
+                        </span>
+                        <div className="text-[10px] text-slate-400">{new Date(a.createdAt).toLocaleString()}</div>
+                      </li>
                     ))}
-                  </select>
+                  </ul>
                 </div>
-                <ReassignForm
-                  employees={employeesQ.data.employees}
-                  onSubmit={(toId, reason) => reassignTask.mutate({ toType: 'user', toId, reason })}
-                  disabled={reassignTask.isPending}
-                />
-              </div>
-            )}
+              );
 
-            {canManage && (
-              <div className="space-y-2 border-t border-slate-200 pt-4">
-                <h3 className="text-xs font-bold uppercase text-slate-600">SLA controls</h3>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={slaPause.isPending}
-                    className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900"
-                    onClick={() => {
-                      const reason = window.prompt('Pause reason?');
-                      if (reason) slaPause.mutate(reason);
-                    }}
-                  >
-                    Pause SLA
-                  </button>
-                  <button
-                    type="button"
-                    disabled={slaResume.isPending}
-                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium"
-                    onClick={() => slaResume.mutate()}
-                  >
-                    Resume SLA
-                  </button>
+              const slaControlsBlock = canManage ? (
+                <div className="space-y-2 border-t border-slate-200 pt-4">
+                  <h3 className="text-xs font-bold uppercase text-slate-600">SLA controls</h3>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={slaPause.isPending}
+                      className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900"
+                      onClick={() => {
+                        const reason = window.prompt('Pause reason?');
+                        if (reason) slaPause.mutate(reason);
+                      }}
+                    >
+                      Pause SLA
+                    </button>
+                    <button
+                      type="button"
+                      disabled={slaResume.isPending}
+                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium"
+                      onClick={() => slaResume.mutate()}
+                    >
+                      Resume SLA
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              ) : null;
 
-            <TaskCsatSection taskId={taskId} boardId={boardId} task={task} />
-            <TaskCommentsSection taskId={taskId} boardId={boardId} />
+              const slaBlock = (
+                <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-700">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-semibold text-slate-800">SLA</span>
+                    <SlaCountdown slaDeadline={task.slaDeadline} paused={Boolean(paused)} />
+                  </div>
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Deadline: {task.slaDeadline ? new Date(task.slaDeadline).toLocaleString() : '—'}
+                  </p>
+                  {paused && <p className="mt-1 text-amber-700">Paused</p>}
+                  {task.slaState &&
+                    typeof task.slaState === 'object' &&
+                    'blockedReason' in task.slaState &&
+                    (task.slaState as { blockedReason?: string }).blockedReason && (
+                      <p className="mt-1 text-xs text-rose-800">
+                        Blocked: {(task.slaState as { blockedReason: string }).blockedReason}
+                      </p>
+                    )}
+                </div>
+              );
 
-            <div className="border-t border-slate-200 pt-4">
-              <h3 className="text-xs font-bold uppercase text-slate-600">Activity</h3>
-              <ul className="mt-2 max-h-48 space-y-2 overflow-y-auto text-xs">
-                {detailQ.data?.activity.map((a) => (
-                  <li key={a.id} className="rounded-lg bg-slate-50 px-2 py-1.5">
-                    <span className="font-semibold text-slate-800">{a.action}</span>
-                    <span className="text-slate-500"> · {a.actorType}</span>
-                    <div className="text-[10px] text-slate-400">{new Date(a.createdAt).toLocaleString()}</div>
-                  </li>
-                ))}
-              </ul>
-            </div>
+              const csatBlock = <TaskCsatSection taskId={taskId} boardId={boardId} task={task} />;
+
+              return canEditFields ? (
+                <Formik
+                  enableReinitialize
+                  initialValues={{
+                    title: task.title,
+                    description: task.description ?? '',
+                    priority: task.priority,
+                    status: task.status,
+                    estimate: task.estimate ?? ('' as const),
+                    resolution: task.resolution ?? '',
+                    startDate: task.startDate ? String(task.startDate).slice(0, 10) : '',
+                    dueDate: task.dueDate ? String(task.dueDate).slice(0, 10) : '',
+                    parentTaskId: task.parentTaskId ?? '',
+                    dependenciesText: (task.dependencies ?? []).join(', '),
+                    metadata: {
+                      ...(Object.fromEntries(
+                        defs.map((d) => {
+                          const cur = task.metadata?.[d.key];
+                          if (d.type === 'number') return [d.key, cur === null || cur === undefined ? '' : String(cur)];
+                          return [d.key, cur == null ? '' : String(cur)];
+                        })
+                      ) as Record<string, string>),
+                      itsmMajorIncidentId:
+                        task.metadata?.itsmMajorIncidentId != null ? String(task.metadata.itsmMajorIncidentId) : '',
+                      itsmProblemId: task.metadata?.itsmProblemId != null ? String(task.metadata.itsmProblemId) : '',
+                      changeWindowStart: isoToDatetimeLocal(task.metadata?.changeWindowStart),
+                      changeWindowEnd: isoToDatetimeLocal(task.metadata?.changeWindowEnd),
+                    },
+                  }}
+                  validationSchema={Yup.object({
+                    title: Yup.string().min(1).max(512).required('Title is required'),
+                    description: Yup.string().max(8000).required('Description is required'),
+                    priority: Yup.string().oneOf(['P0', 'P1', 'P2', 'P3', 'P4']).required(),
+                    status: Yup.string().required(),
+                    estimate: estimateSchema(mode),
+                    resolution: Yup.string().max(8000).nullable(),
+                    startDate: Yup.string().required('Start date is required'),
+                    dueDate: Yup.string().required('Due date is required'),
+                    parentTaskId: Yup.string()
+                      .nullable()
+                      .transform((v) => (v === '' || v === undefined ? '' : String(v).trim()))
+                      .test('uuid', 'Invalid parent UUID', (v) => !v || UUID_RE.test(v)),
+                    dependenciesText: Yup.string().max(4000).nullable(),
+                    metadata: Yup.object({
+                      ...Object.fromEntries(
+                        defs.map((d) => {
+                          if (d.type === 'text') return [d.key, Yup.string().max(2000).nullable()];
+                          if (d.type === 'number')
+                            return [
+                              d.key,
+                              Yup.number().nullable().transform((v, orig) => (orig === '' ? null : v)),
+                            ];
+                          const opts = [...(d.options ?? []), '', null] as (string | null)[];
+                          return [d.key, Yup.string().nullable().oneOf(opts)];
+                        })
+                      ),
+                      itsmMajorIncidentId: Yup.string()
+                        .nullable()
+                        .transform((v) => (v === '' ? '' : v))
+                        .test('uuid', 'Invalid UUID', (v) => !v || UUID_RE.test(v)),
+                      itsmProblemId: Yup.string()
+                        .nullable()
+                        .transform((v) => (v === '' ? '' : v))
+                        .test('uuid', 'Invalid UUID', (v) => !v || UUID_RE.test(v)),
+                      changeWindowStart: Yup.string().nullable(),
+                      changeWindowEnd: Yup.string().nullable(),
+                    }),
+                  })}
+                  onSubmit={async (values, { setStatus }) => {
+                    setStatus(undefined);
+                    if (!canEditP0 && values.priority === 'P0' && task.priority !== 'P0') {
+                      setStatus('Only Admin/Manager can set P0');
+                      return;
+                    }
+                    const metaOut: Record<string, unknown> = { ...(task.metadata ?? {}) };
+                    const md = values.metadata as Record<string, string | number | undefined>;
+                    for (const d of defs) {
+                      const raw = md[d.key];
+                      if (d.type === 'number') {
+                        metaOut[d.key] = raw === '' || raw === undefined ? null : Number(raw);
+                      } else {
+                        metaOut[d.key] = raw === '' ? null : raw;
+                      }
+                    }
+                    const mi = String(md.itsmMajorIncidentId ?? '').trim();
+                    metaOut.itsmMajorIncidentId = mi && UUID_RE.test(mi) ? mi : null;
+                    const pr = String(md.itsmProblemId ?? '').trim();
+                    metaOut.itsmProblemId = pr && UUID_RE.test(pr) ? pr : null;
+                    const cws = String(md.changeWindowStart ?? '').trim();
+                    const cwe = String(md.changeWindowEnd ?? '').trim();
+                    metaOut.changeWindowStart = cws ? new Date(cws).toISOString() : null;
+                    metaOut.changeWindowEnd = cwe ? new Date(cwe).toISOString() : null;
+                    const start =
+                      values.startDate && String(values.startDate).trim() !== ''
+                        ? String(values.startDate).slice(0, 10)
+                        : null;
+                    const due =
+                      values.dueDate && String(values.dueDate).trim() !== ''
+                        ? String(values.dueDate).slice(0, 10)
+                        : null;
+                    const ptRaw = String(values.parentTaskId ?? '').trim();
+                    const nextParent = ptRaw === '' ? null : ptRaw;
+                    const prevParent = task.parentTaskId ?? null;
+                    try {
+                      const body: Record<string, unknown> = {
+                        title: values.title,
+                        description: values.description || null,
+                        priority: values.priority,
+                        status: values.status,
+                        estimate: values.estimate === '' ? null : Number(values.estimate),
+                        resolution: values.resolution?.trim() ? values.resolution.trim() : null,
+                        startDate: start,
+                        dueDate: due,
+                        dependencies: parseDepIds(values.dependenciesText ?? ''),
+                        metadata: metaOut,
+                      };
+                      if (prevParent !== nextParent) {
+                        body.parentTaskId = nextParent;
+                      }
+                      await patchTask.mutateAsync(body);
+                    } catch (e) {
+                      setStatus((e as Error).message);
+                    }
+                  }}
+                >
+                  {({ isSubmitting, status }) => (
+                    <Form className="space-y-3">
+                      {/* 1. Title */}
+                      <div>
+                        <label className="text-xs font-semibold text-slate-600">Title *</label>
+                        <Field name="title" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+                        <ErrorMessage name="title" component="p" className="text-xs text-rose-600" />
+                      </div>
+                      
+                      {/* 2. Description */}
+                      <div>
+                        <label className="text-xs font-semibold text-slate-600">Description *</label>
+                        <Field as="textarea" name="description" rows={3} className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+                        <ErrorMessage name="description" component="p" className="text-xs text-rose-600" />
+                      </div>
+                      
+                      {/* 3. Priority, Status, Estimate */}
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                        <div>
+                          <label className="text-xs font-semibold text-slate-600">Priority *</label>
+                          <Field as="select" name="priority" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm">
+                            {(['P0', 'P1', 'P2', 'P3', 'P4'] as const).map((p) => (
+                              <option key={p} value={p} disabled={!canEditP0 && p === 'P0'}>
+                                {p}
+                              </option>
+                            ))}
+                          </Field>
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-slate-600">Status *</label>
+                          <Field as="select" name="status" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm">
+                            {wfCols.map((c) => (
+                              <option key={c} value={c}>
+                                {c}
+                              </option>
+                            ))}
+                          </Field>
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-slate-600">{estLabel}</label>
+                          <Field
+                            name="estimate"
+                            type="number"
+                            step={mode === 'hours' ? '0.5' : '1'}
+                            className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                          />
+                          <ErrorMessage name="estimate" component="p" className="text-xs text-rose-600" />
+                        </div>
+                      </div>
+
+                      {/* 4. Current Assignee */}
+                      {assigneeControlsBlock}
+
+                      {/* 5-6. Start date, Due date */}
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div>
+                          <label className="text-xs font-semibold text-slate-600">Start date *</label>
+                          <Field name="startDate" type="date" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+                          <ErrorMessage name="startDate" component="p" className="text-xs text-rose-600" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-slate-600">Due date *</label>
+                          <Field name="dueDate" type="date" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+                          <ErrorMessage name="dueDate" component="p" className="text-xs text-rose-600" />
+                        </div>
+                      </div>
+
+                      {/* 4. Comments */}
+                      {commentsBlock}
+
+                      {/* 5. Related work */}
+                      {relatedWorkBlock}
+                      
+                      {/* Dependencies (kept near Related work) */}
+                      <div>
+                        <label className="text-xs font-semibold text-slate-600">Dependencies (task UUIDs, comma-separated)</label>
+                        <Field
+                          name="dependenciesText"
+                          as="textarea"
+                          rows={2}
+                          className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 font-mono text-xs"
+                        />
+                      </div>
+
+                      {/* 6. Resolution (when Done) */}
+                      <div>
+                        <label className="text-xs font-semibold text-slate-600">Resolution (when Done)</label>
+                        <Field name="resolution" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
+                      </div>
+
+                      {/* 7. Activity */}
+                      {activityBlock}
+
+                      {/* 8. SLA controls */}
+                      {slaControlsBlock}
+
+                      {/* 9. ITSM links */}
+                      <div className="space-y-2 rounded-lg border border-slate-100 bg-slate-50/80 p-2">
+                        <p className="text-[10px] font-bold uppercase text-slate-500">ITSM links</p>
+                        <div>
+                          <label className="text-xs font-semibold text-slate-600">Parent task ID (optional)</label>
+                          <Field
+                            name="parentTaskId"
+                            placeholder="UUID of parent in this project, empty to clear"
+                            className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 font-mono text-xs"
+                          />
+                          <ErrorMessage name="parentTaskId" component="p" className="text-xs text-rose-600" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-slate-600">Major incident task UUID</label>
+                          <Field
+                            name="metadata.itsmMajorIncidentId"
+                            placeholder="Optional UUID"
+                            className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 font-mono text-xs"
+                          />
+                          <ErrorMessage name="metadata.itsmMajorIncidentId" component="p" className="text-xs text-rose-600" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-slate-600">Problem task UUID</label>
+                          <Field
+                            name="metadata.itsmProblemId"
+                            placeholder="Optional UUID"
+                            className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 font-mono text-xs"
+                          />
+                          <ErrorMessage name="metadata.itsmProblemId" component="p" className="text-xs text-rose-600" />
+                        </div>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          <div>
+                            <label className="text-xs font-semibold text-slate-600">Change window start</label>
+                            <Field name="metadata.changeWindowStart" type="datetime-local" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" />
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-slate-600">Change window end</label>
+                            <Field name="metadata.changeWindowEnd" type="datetime-local" className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Custom fields (kept after ITSM links) */}
+                      {defs.length > 0 && (
+                        <div className="space-y-2 rounded-lg border border-slate-100 bg-slate-50/80 p-2">
+                          <p className="text-[10px] font-bold uppercase text-slate-500">Custom fields</p>
+                          {defs.map((d) => (
+                            <div key={d.key}>
+                              <label className="text-xs font-semibold text-slate-600">{d.label}</label>
+                              {d.type === 'select' ? (
+                                <Field as="select" name={`metadata.${d.key}`} className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm">
+                                  <option value="">—</option>
+                                  {(d.options ?? []).map((o) => (
+                                    <option key={o} value={o}>
+                                      {o}
+                                    </option>
+                                  ))}
+                                </Field>
+                              ) : (
+                                <Field
+                                  name={`metadata.${d.key}`}
+                                  type={d.type === 'number' ? 'number' : 'text'}
+                                  className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                                />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* 10. SLA */}
+                      {slaBlock}
+
+                      {/* Other sections */}
+                      {csatBlock}
+
+                      {status && <p className="text-xs text-rose-700">{status}</p>}
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="w-full rounded-xl bg-slate-900 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                      >
+                        Save changes
+                      </button>
+                    </Form>
+                  )}
+                </Formik>
+              ) : (
+                <div className="space-y-4">
+                  {/* 1-3. Title, Desc, Grid */}
+                  <div className="text-sm text-slate-700 space-y-2">
+                    <p className="font-semibold">{task.title}</p>
+                    <p className="whitespace-pre-wrap text-slate-600">{task.description || '—'}</p>
+                    <div className="grid grid-cols-3 gap-3 rounded-lg bg-slate-50 p-2 text-xs">
+                      <div>
+                        <span className="block font-semibold text-slate-500">Priority</span>
+                        <span>{task.priority}</span>
+                      </div>
+                      <div>
+                        <span className="block font-semibold text-slate-500">Status</span>
+                        <span>{task.status}</span>
+                      </div>
+                      <div>
+                        <span className="block font-semibold text-slate-500">Estimate</span>
+                        <span>{task.estimate ?? '—'}</span>
+                      </div>
+                    </div>
+                    {assigneeControlsBlock}
+                    <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-2 text-xs">
+                      <div>
+                        <span className="block font-semibold text-slate-500">Start</span>
+                        <span>{task.startDate ? String(task.startDate).slice(0, 10) : '—'}</span>
+                      </div>
+                      <div>
+                        <span className="block font-semibold text-slate-500">Due</span>
+                        <span>{task.dueDate ? String(task.dueDate).slice(0, 10) : '—'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 4. Comments */}
+                  {commentsBlock}
+
+                  {/* 5. Related work */}
+                  {relatedWorkBlock}
+                  
+                  {/* Dependencies (Read-only) */}
+                  <div className="text-sm text-slate-700">
+                    <p className="mt-2 text-xs text-slate-500">
+                      Dependencies:{' '}
+                      {Number(task.dependencies?.length ?? 0) > 0 ? String(task.dependencies!.length) : '—'}
+                    </p>
+                  </div>
+
+                  {/* 6. Resolution */}
+                  <div className="text-sm text-slate-700">
+                    {task.resolution && <p className="mt-1 text-xs text-slate-600">Resolution: {task.resolution}</p>}
+                  </div>
+
+                  {/* 7. Activity */}
+                  {activityBlock}
+
+                  {/* 8. SLA controls */}
+                  {slaControlsBlock}
+
+                  {/* 9. ITSM links (Read-only) */}
+                  {(Boolean(task.metadata?.itsmMajorIncidentId) || Boolean(task.metadata?.itsmProblemId) || Boolean(task.metadata?.changeWindowStart)) ? (
+                    <div className="space-y-2 rounded-lg border border-slate-100 bg-slate-50/80 p-2 text-sm text-slate-700">
+                      <p className="text-[10px] font-bold uppercase text-slate-500">ITSM links</p>
+                      {Boolean(task.metadata?.itsmMajorIncidentId) ? <p className="text-xs">Major Incident: <span className="font-mono">{String(task.metadata!.itsmMajorIncidentId)}</span></p> : null}
+                      {Boolean(task.metadata?.itsmProblemId) ? <p className="text-xs">Problem: <span className="font-mono">{String(task.metadata!.itsmProblemId)}</span></p> : null}
+                      {Boolean(task.metadata?.changeWindowStart) ? <p className="text-xs">Change Window: {new Date(String(task.metadata!.changeWindowStart)).toLocaleString()} - {task.metadata?.changeWindowEnd ? new Date(String(task.metadata!.changeWindowEnd)).toLocaleString() : '?'}</p> : null}
+                    </div>
+                  ) : null}
+
+                  {/* 10. SLA */}
+                  {slaBlock}
+
+                  {/* Other sections */}
+                  {csatBlock}
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
@@ -1036,33 +1195,42 @@ function ReassignForm({
   onSubmit: (toId: string, reason: string) => void;
   disabled: boolean;
 }) {
+  const [toId, setToId] = useState('');
+  const [reason, setReason] = useState('');
+
   return (
-    <Formik
-      initialValues={{ toId: '', reason: '' }}
-      validationSchema={Yup.object({
-        toId: Yup.string().required(),
-        reason: Yup.string().min(1).required('Reason required'),
-      })}
-      onSubmit={(vals, { resetForm }) => {
-        onSubmit(vals.toId, vals.reason);
-        resetForm();
-      }}
-    >
-      <Form className="mt-2 space-y-2 rounded-lg border border-slate-100 p-2">
-        <p className="text-[10px] font-semibold uppercase text-slate-500">Reassign (requires reason)</p>
-        <Field as="select" name="toId" className="w-full rounded border border-slate-200 px-2 py-1 text-sm">
-          <option value="">Target user…</option>
-          {employees.map((emp) => (
-            <option key={emp.userId} value={emp.userId}>
-              {emp.firstName} {emp.lastName}
-            </option>
-          ))}
-        </Field>
-        <Field name="reason" placeholder="Reason" className="w-full rounded border border-slate-200 px-2 py-1 text-sm" />
-        <button type="submit" disabled={disabled} className="text-xs font-semibold text-indigo-700">
-          Reassign
-        </button>
-      </Form>
-    </Formik>
+    <div className="mt-2 space-y-2 rounded-lg border border-slate-100 p-2">
+      <select
+        value={toId}
+        onChange={(e) => setToId(e.target.value)}
+        className="w-full rounded border border-slate-200 px-2 py-1 text-sm bg-white"
+      >
+        <option value="">Target user…</option>
+        {employees.map((emp) => (
+          <option key={emp.userId} value={emp.userId}>
+            {emp.firstName} {emp.lastName}
+          </option>
+        ))}
+      </select>
+      <input
+        type="text"
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder="Reason"
+        className="w-full rounded border border-slate-200 px-2 py-1 text-sm"
+      />
+      <button
+        type="button"
+        disabled={disabled || !toId || !reason.trim()}
+        onClick={() => {
+          onSubmit(toId, reason);
+          setToId('');
+          setReason('');
+        }}
+        className="text-xs font-semibold text-indigo-700 disabled:opacity-50"
+      >
+        Reassign
+      </button>
+    </div>
   );
 }

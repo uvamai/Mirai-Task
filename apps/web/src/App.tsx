@@ -22,6 +22,7 @@ import { TaskTablePage } from './pages/TaskTablePage';
 import { AcceptInvitePage } from './pages/AcceptInvitePage';
 import { PublicIntakePage } from './pages/PublicIntakePage';
 import { TenantOrgSettingsPage } from './pages/TenantOrgSettingsPage';
+import { TenantIntegrationsPage } from './pages/TenantIntegrationsPage';
 import { MyWorkPage } from './pages/MyWorkPage';
 import { ProjectItsmSettingsPage } from './pages/ProjectItsmSettingsPage';
 import { ProjectDocsPage } from './pages/ProjectDocsPage';
@@ -71,6 +72,7 @@ export default function App() {
         <Route path="profile" element={<ProfilePage />} />
         <Route path="employees" element={<EmployeesPage />} />
         <Route path="org-settings" element={<TenantOrgSettingsPage />} />
+        <Route path="integrations" element={<TenantIntegrationsPage />} />
         <Route path="admin-portal/dashboard" element={<AdminPortalDashboardPage />} />
         <Route path="admin-portal/users" element={<AdminPortalUsersPage />} />
         <Route path="admin-portal/subscriptions" element={<AdminPortalSubscriptionsPage />} />

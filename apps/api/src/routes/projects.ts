@@ -12,6 +12,8 @@ import { syncAdminManagerProjectLeads } from '../services/projectMemberSync';
 import { getBoardTemplate } from '../services/boardTemplatesCatalog';
 import { nextTaskKey } from '../services/taskKeys';
 import { assertManagerMayCreateProject, resolveOrgPolicies } from '../services/orgPolicies';
+import { generateProjectWithAI, assignRolesToMembers } from '../services/aiProjectGenerator';
+
 import type { TaskPriority } from '../types/task';
 
 function slugifyPublicIntakeKey(raw: string): string {
@@ -456,6 +458,78 @@ projectsRouter.post(
       }
       logger.error('create project failed', { err: e, requestId: req.requestId });
       res.status(500).json({ error: 'Could not create project' });
+    }
+  }
+);
+
+projectsRouter.post(
+  '/projects/:projectId/generate',
+  authenticateJwt,
+  loadMembership,
+  requireRole('ADMIN', 'MANAGER'),
+  async (req, res) => {
+    const { description, techStack, template, keyRequirements } = req.body;
+    if (!description || !techStack || !template) {
+      res.status(400).json({ error: 'Missing required inputs: description, techStack, template' });
+      return;
+    }
+
+    try {
+      await assertProjectMemberAccess(req.tenantId!, req.userId!, req.membership?.role, req.params.projectId);
+      
+      const project = await Project.findOne({ where: { id: req.params.projectId, tenantId: req.tenantId! } });
+      if (!project) {
+        res.status(404).json({ error: 'Project not found' });
+        return;
+      }
+
+      const board = await Board.findOne({ where: { projectId: project.id, tenantId: req.tenantId! }, order: [['position', 'ASC']] });
+      if (!board) {
+        res.status(400).json({ error: 'No default board found' });
+        return;
+      }
+
+      // Call AI Service
+      const output = await generateProjectWithAI(req.tenantId!, project.id, { description, techStack, template, keyRequirements: keyRequirements || '' });
+      
+      // Update Project
+      project.prdContent = output.prdContent;
+      project.timeline = output.timeline;
+      await project.save();
+
+      // Assign Roles
+      const uniqueRoles = [...new Set(output.tasks.map(t => t.role))];
+      const roleMap = await assignRolesToMembers(req.tenantId!, project.id, uniqueRoles);
+
+      // Create Tasks
+      for (const t of output.tasks) {
+        const taskKey = await nextTaskKey(req.tenantId!);
+        await Task.create({
+          tenantId: req.tenantId!,
+          projectId: project.id,
+          boardId: board.id,
+          key: taskKey,
+          title: t.title,
+          description: t.description,
+          type: t.type,
+          priority: 'P2',
+          status: 'todo',
+          assigneeId: roleMap[t.role] || null,
+          assigneeType: roleMap[t.role] ? 'user' : null,
+          createdBy: req.userId!,
+          slaState: {},
+          tags: [t.role],
+          position: Date.now() + Math.random(),
+          metadata: {},
+          dependencies: [],
+          customFields: t.customFields || {},
+        });
+      }
+
+      res.json({ success: true, project: { id: project.id, prdContent: project.prdContent, timeline: project.timeline } });
+    } catch (e) {
+      logger.error('Project generation failed', { err: e });
+      res.status(500).json({ error: e instanceof Error ? e.message : 'Internal server error' });
     }
   }
 );

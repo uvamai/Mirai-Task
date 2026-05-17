@@ -10,6 +10,7 @@ import {
   Tenant,
   TenantMembership,
   User,
+  ProjectMember,
 } from '../models';
 import { authenticateJwt, loadMembership, requireRole } from '../middleware/auth';
 import {
@@ -161,6 +162,7 @@ tasksRouter.get('/boards/:boardId/tasks', authenticateJwt, loadMembership, async
       updatedAt: t.updatedAt,
       resolution: t.resolution,
       dueDate: t.dueDate,
+      startDate: t.startDate,
       metadata: t.metadata,
       dependencies: t.dependencies,
       parentTaskId: t.parentTaskId,
@@ -308,6 +310,14 @@ tasksRouter.get('/tasks/:taskId', authenticateJwt, loadMembership, async (req, r
     order: [['createdAt', 'DESC']],
     limit: 50,
   });
+  const actorIds = Array.from(new Set(logs.filter((l) => l.actorType === 'user' && l.actorUserId).map((l) => l.actorUserId!)));
+  const actors = actorIds.length > 0 ? await User.findAll({
+    where: { id: { [Op.in]: actorIds } },
+    attributes: ['id', 'firstName', 'lastName', 'email'],
+  }) : [];
+  console.log('actorIds:', actorIds);
+  console.log('actors:', actors.map(a => a.toJSON()));
+  const actorMap = new Map(actors.map((a) => [a.id, a]));
   const [parentRow, subtasks] = await Promise.all([
     task.parentTaskId
       ? Task.findOne({
@@ -349,20 +359,25 @@ tasksRouter.get('/tasks/:taskId', authenticateJwt, loadMembership, async (req, r
       estimateUnitLabel: estimateUnitLabel(mode),
       resolution: task.resolution,
       dueDate: task.dueDate,
+      startDate: task.startDate,
       metadata: task.metadata,
       workflowStages: board && project ? resolveWorkflowStageNames(board, project) : [],
       customFieldDefs: project ? parseCustomFieldDefs(project.settings?.customFieldDefs) : [],
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
     },
-    activity: logs.map((l) => ({
-      id: l.id,
-      action: l.action,
-      actorType: l.actorType,
-      before: l.beforeJson,
-      after: l.afterJson,
-      createdAt: l.createdAt,
-    })),
+    activity: logs.map((l) => {
+      const u = l.actorType === 'user' && l.actorUserId ? actorMap.get(l.actorUserId) : null;
+      return {
+        id: l.id,
+        action: l.action,
+        actorType: l.actorType,
+        actorUser: u ? { id: u.id, firstName: u.firstName, lastName: u.lastName, email: u.email } : null,
+        before: l.beforeJson,
+        after: l.afterJson,
+        createdAt: l.createdAt,
+      };
+    }),
   });
 });
 
@@ -737,6 +752,15 @@ tasksRouter.post(
     task.assigneeType = value.assigneeType;
     task.assigneeId = value.assigneeId;
     await task.save();
+
+    if (value.assigneeType === 'user' && value.assigneeId) {
+      // Ensure the user has access to the project so the task shows up in My Work
+      await ProjectMember.findOrCreate({
+        where: { tenantId: req.tenantId!, projectId: task.projectId, userId: value.assigneeId },
+        defaults: { tenantId: req.tenantId!, projectId: task.projectId, userId: value.assigneeId, role: 'CONTRIBUTOR' },
+      });
+    }
+
     await logActivity({
       tenantId: req.tenantId!,
       taskId: task.id,
@@ -805,6 +829,15 @@ tasksRouter.post(
     task.assigneeType = value.toType;
     task.assigneeId = value.toId;
     await task.save();
+
+    if (value.toType === 'user' && value.toId) {
+      // Ensure the user has access to the project so the task shows up in My Work
+      await ProjectMember.findOrCreate({
+        where: { tenantId: req.tenantId!, projectId: task.projectId, userId: value.toId },
+        defaults: { tenantId: req.tenantId!, projectId: task.projectId, userId: value.toId, role: 'CONTRIBUTOR' },
+      });
+    }
+
     await logActivity({
       tenantId: req.tenantId!,
       taskId: task.id,

@@ -10,6 +10,8 @@ export interface TaskAttributes {
   key: string;
   title: string;
   description: string | null;
+  type: string;
+  customFields: Record<string, unknown>;
   priority: TaskPriority;
   status: string;
   assigneeType: string | null;
@@ -34,6 +36,8 @@ type TaskCreation = Optional<
   TaskAttributes,
   | 'id'
   | 'description'
+  | 'type'
+  | 'customFields'
   | 'assigneeType'
   | 'assigneeId'
   | 'createdBy'
@@ -61,6 +65,8 @@ export class Task extends Model<TaskAttributes, TaskCreation> implements TaskAtt
   declare key: string;
   declare title: string;
   declare description: string | null;
+  declare type: string;
+  declare customFields: Record<string, unknown>;
   declare priority: TaskPriority;
   declare status: string;
   declare assigneeType: string | null;
@@ -90,6 +96,8 @@ Task.init(
     key: { type: DataTypes.STRING(64), allowNull: false },
     title: { type: DataTypes.STRING(512), allowNull: false },
     description: { type: DataTypes.TEXT, allowNull: true },
+    type: { type: DataTypes.STRING(32), allowNull: false, defaultValue: 'task' },
+    customFields: { type: DataTypes.JSONB, allowNull: false, defaultValue: {}, field: 'custom_fields' },
     priority: { type: DataTypes.STRING(8), allowNull: false },
     status: { type: DataTypes.STRING(64), allowNull: false },
     assigneeType: { type: DataTypes.STRING(16), allowNull: true, field: 'assignee_type' },

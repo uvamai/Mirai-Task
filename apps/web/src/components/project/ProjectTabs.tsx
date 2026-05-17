@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { useState } from 'react';
 import { AddProjectViewModal } from './AddProjectViewModal';
-import { CustomizeBoardEntryModal } from './CustomizeBoardEntryModal';
+import { List, LayoutGrid, Calendar, BarChartHorizontal, Table2, Plus, LayoutDashboard } from 'lucide-react';
 
 export function ProjectTabs({
   projectId,
@@ -12,109 +12,72 @@ export function ProjectTabs({
 }) {
   const boardBase = activeBoardId ? `/app/projects/${projectId}/boards/${activeBoardId}` : undefined;
   const [addViewOpen, setAddViewOpen] = useState(false);
-  const [customizeOpen, setCustomizeOpen] = useState(false);
 
-  const disabled = (label: string) => (
-    <span className="rounded-lg px-2 py-1 text-sm font-semibold text-slate-400" title="Coming soon">
+  const disabled = (label: string, icon: React.ReactNode) => (
+    <span className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-400 cursor-not-allowed" title="Coming soon">
+      {icon}
       {label}
     </span>
   );
 
+  const navClass = ({ isActive }: { isActive: boolean }) => 
+    `flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition ${isActive ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`;
+
   return (
-    <nav className="flex flex-wrap items-center gap-1" aria-label="Project views">
+    <nav className="flex flex-wrap items-center gap-1 border-b border-slate-200 w-full" aria-label="Project views">
       <AddProjectViewModal
         open={addViewOpen}
         onClose={() => setAddViewOpen(false)}
         projectId={projectId}
         boardId={activeBoardId}
       />
-      <CustomizeBoardEntryModal
-        open={customizeOpen}
-        onClose={() => setCustomizeOpen(false)}
-        boardId={activeBoardId}
-      />
-      <NavLink
-        to={`/app/projects/${projectId}`}
-        end
-        className={({ isActive }) =>
-          `rounded-lg px-2 py-1 text-sm font-semibold ${isActive ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white/70'}`
-        }
-      >
+      
+      <NavLink to={`/app/projects/${projectId}`} end className={navClass}>
+        <LayoutDashboard size={14} className="text-slate-400" />
         Summary
       </NavLink>
-      <NavLink
-        to={`/app/projects/${projectId}/getting-started`}
-        className={({ isActive }) =>
-          `rounded-lg px-2 py-1 text-sm font-semibold ${isActive ? 'bg-indigo-900 text-white' : 'text-indigo-700 hover:bg-indigo-50'}`
-        }
-      >
-        Get data in
-      </NavLink>
+
       {boardBase ? (
         <>
-          <NavLink
-            to={`${boardBase}/list`}
-            className={({ isActive }) =>
-              `rounded-lg px-2 py-1 text-sm font-semibold ${isActive ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white/70'}`
-            }
-          >
+          <NavLink to={`${boardBase}/list`} className={navClass}>
+            <List size={14} className="text-slate-400" />
             List
           </NavLink>
-          <NavLink
-            to={`${boardBase}/table`}
-            className={({ isActive }) =>
-              `rounded-lg px-2 py-1 text-sm font-semibold ${isActive ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white/70'}`
-            }
-          >
-            Table
-          </NavLink>
-          <NavLink
-            to={boardBase}
-            end
-            className={({ isActive }) =>
-              `rounded-lg px-2 py-1 text-sm font-semibold ${isActive ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white/70'}`
-            }
-          >
+          <NavLink to={boardBase} end className={navClass}>
+            <LayoutGrid size={14} className="text-indigo-500" />
             Board
           </NavLink>
-          <NavLink
-            to={`${boardBase}/calendar`}
-            className={({ isActive }) =>
-              `rounded-lg px-2 py-1 text-sm font-semibold ${isActive ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white/70'}`
-            }
-          >
+          <NavLink to={`${boardBase}/calendar`} className={navClass}>
+            <Calendar size={14} className="text-orange-500" />
             Calendar
+          </NavLink>
+          <NavLink to={`${boardBase}/gantt`} className={navClass}>
+            <BarChartHorizontal size={14} className="text-rose-500" />
+            Gantt
+          </NavLink>
+          <NavLink to={`${boardBase}/table`} className={navClass}>
+            <Table2 size={14} className="text-emerald-500" />
+            Table
           </NavLink>
         </>
       ) : (
         <>
-          {disabled('List')}
-          {disabled('Table')}
-          {disabled('Board')}
-          {disabled('Calendar')}
+          {disabled('List', <List size={14} />)}
+          {disabled('Board', <LayoutGrid size={14} />)}
+          {disabled('Calendar', <Calendar size={14} />)}
+          {disabled('Gantt', <BarChartHorizontal size={14} />)}
+          {disabled('Table', <Table2 size={14} />)}
         </>
       )}
-      {disabled('Timeline')}
-      {disabled('Docs')}
-      {disabled('Forms')}
+
       <button
         type="button"
         onClick={() => setAddViewOpen(true)}
-        className="rounded-lg border border-dashed border-slate-300 px-2 py-1 text-sm font-semibold text-indigo-700 hover:bg-indigo-50"
+        className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition"
       >
-        + View
+        <Plus size={14} />
+        View
       </button>
-      {boardBase ? (
-        <button
-          type="button"
-          onClick={() => setCustomizeOpen(true)}
-          className="rounded-lg border border-slate-200 bg-white/80 px-2 py-1 text-sm font-semibold text-slate-700 hover:bg-white"
-          title="Default view when opening this board"
-        >
-          Customize
-        </button>
-      ) : null}
     </nav>
   );
 }
-
