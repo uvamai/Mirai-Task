@@ -1,7 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useOutletContext, Navigate } from 'react-router-dom';
 import { apiFetch, apiJson } from '../api/client';
-import { useAppSelector } from '../hooks';
 
 type BillingResponse = {
   billingMode: string;
@@ -17,13 +16,13 @@ type BillingResponse = {
 };
 
 export function BillingPage() {
-  const tenantId = useAppSelector((s) => s.auth.tenantId);
   const [params] = useSearchParams();
   const checkoutOk = params.get('checkout') === 'success';
+  const { isAdmin, tenantId } = useOutletContext<{ isAdmin?: boolean; tenantId?: string }>();
 
   const q = useQuery({
     queryKey: ['billing', tenantId],
-    enabled: Boolean(tenantId),
+    enabled: Boolean(tenantId && isAdmin),
     queryFn: () => apiJson<BillingResponse>(`/tenants/${tenantId}/billing`),
   });
 
@@ -54,6 +53,11 @@ export function BillingPage() {
       window.location.href = data.url;
     },
   });
+
+  // Force-redirect non-admins away from billing page
+  if (isAdmin === false) {
+    return <Navigate to="/app" replace />;
+  }
 
   if (!tenantId) return <p className="text-slate-600">No tenant context</p>;
 
